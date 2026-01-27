@@ -1,0 +1,11 @@
+services:
+  notebook-app:
+    build: .
+    ports:
+      - "8005:8005"
+    volumes:
+      - ./data:/app/data
+      - ./app:/app/app
+      - ./static:/app/static
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/notebook.db

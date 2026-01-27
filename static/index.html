@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portable Notebook</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Notebook</h2>
+                <div class="sidebar-actions">
+                    <button id="add-doc-btn" title="Add Document">📄+</button>
+                </div>
+            </div>
+            <div id="tree-container" class="tree-container">
+                <!-- Tree will be rendered here -->
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="editor-header">
+                <input type="text" id="doc-title" placeholder="Document Title..." class="title-input">
+                <div class="editor-toolbar">
+                    <button id="bold-btn" class="toolbar-btn">B</button>
+                    <button id="h1-btn" class="toolbar-btn">H1</button>
+                    <button id="h2-btn" class="toolbar-btn">H2</button>
+                    <button id="h3-btn" class="toolbar-btn">H3</button>
+                    <button id="img-btn" class="toolbar-btn">🖼️</button>
+                    <div class="toolbar-separator"></div>
+                    <button id="export-doc-btn" class="toolbar-btn">Export HTML</button>
+                    <button id="export-all-btn" class="toolbar-btn">Export All</button>
+                    <button id="import-btn" class="toolbar-btn">Import</button>
+                    <button id="delete-btn" class="toolbar-btn danger">Delete</button>
+                </div>
+            </header>
+            <div id="editor" class="editor-content" contenteditable="true">
+                <!-- Content will be here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="modal-container hidden">
+        <div class="modal">
+            <h3 id="modal-title">Modal Title</h3>
+            <div id="modal-body" class="modal-body"></div>
+            <div class="modal-footer">
+                <button id="modal-cancel" class="btn">Cancel</button>
+                <button id="modal-confirm" class="btn primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/tree.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
