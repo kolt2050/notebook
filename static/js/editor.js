@@ -21,6 +21,7 @@ const Editor = {
         const items = (e.clipboardData || e.originalEvent.clipboardData).items;
         for (const item of items) {
             if (item.type.indexOf('image') !== -1) {
+                e.preventDefault(); // Prevent browser's default paste behavior
                 const file = item.getAsFile();
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -28,6 +29,7 @@ const Editor = {
                     this.format('insertHTML', img);
                 };
                 reader.readAsDataURL(file);
+                return; // Exit after handling image
             }
         }
     },

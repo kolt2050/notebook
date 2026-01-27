@@ -73,8 +73,10 @@ const Tree = {
         row.appendChild(actions);
         li.appendChild(row);
 
-        row.onclick = (e) => {
+        row.onmousedown = (e) => {
+            e.preventDefault(); // Prevent focus loss interference
             e.stopPropagation();
+            Editor.save(); // Manually save current document since blur won't fire
             this.selectItem(item);
         };
 
