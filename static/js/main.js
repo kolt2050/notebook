@@ -12,8 +12,15 @@ const Main = {
     },
 
     addEventListeners() {
-
         document.getElementById('add-doc-btn').onclick = () => this.addNew();
+
+        // Search with debounce
+        const searchInput = document.getElementById('search-input');
+        let searchTimeout;
+        searchInput.oninput = () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => this.handleSearch(searchInput.value), 300);
+        };
 
         // Auto-save on blur
         Editor.titleInput.onblur = () => Editor.save();
@@ -192,6 +199,37 @@ const Main = {
         const count = await API.getDocCount();
         const el = document.getElementById('doc-count');
         if (el) el.textContent = count;
+    },
+
+    async handleSearch(query) {
+        const treeContainer = document.getElementById('tree-container');
+        const allItems = treeContainer.querySelectorAll('li[data-id]');
+
+        // If query is empty, show all
+        if (query.length < 1) {
+            allItems.forEach(li => {
+                li.style.display = '';
+                li.classList.remove('search-match');
+            });
+            return;
+        }
+
+        // Get matching IDs from server
+        const result = await API.search(query);
+        console.log('[Search] Query:', query, 'Result:', result);
+        const visibleIds = new Set([...result.matches, ...result.ancestors]);
+
+        // Filter tree
+        allItems.forEach(li => {
+            const id = parseInt(li.dataset.id);
+            if (visibleIds.has(id)) {
+                li.style.display = '';
+                li.classList.toggle('search-match', result.matches.includes(id));
+            } else {
+                li.style.display = 'none';
+                li.classList.remove('search-match');
+            }
+        });
     },
 
     downloadFile(filename, text) {

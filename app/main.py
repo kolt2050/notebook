@@ -46,6 +46,56 @@ async def get_document_count(db: AsyncSession = Depends(database.get_db)):
     count = result.scalar()
     return {"count": count}
 
+@app.get("/api/search")
+async def search_documents(q: str = "", db: AsyncSession = Depends(database.get_db)):
+    import re
+    
+    if len(q) < 1:
+        return {"matches": [], "ancestors": []}
+    
+    query_lower = q.lower()
+    
+    # Get all documents
+    result = await db.execute(select(models.Document))
+    all_docs = result.scalars().all()
+    all_docs_map = {doc.id: doc for doc in all_docs}
+    
+    # Helper to strip HTML tags and get plain text
+    def get_plain_text(html: str) -> str:
+        if not html:
+            return ""
+        # Remove base64 data first (images)
+        text = re.sub(r'data:[^;]+;base64,[A-Za-z0-9+/=]+', '', html)
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', ' ', text)
+        # Normalize whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text.lower()
+    
+    # Search in title and plain text content
+    match_ids = set()
+    for doc in all_docs:
+        title_match = query_lower in doc.title.lower()
+        content_match = query_lower in get_plain_text(doc.content)
+        if title_match or content_match:
+            match_ids.add(doc.id)
+    
+    # Find all ancestors to preserve tree structure
+    ancestor_ids = set()
+    for doc_id in match_ids:
+        doc = all_docs_map.get(doc_id)
+        if doc:
+            parent_id = doc.parent_id
+            while parent_id is not None:
+                ancestor_ids.add(parent_id)
+                parent_doc = all_docs_map.get(parent_id)
+                parent_id = parent_doc.parent_id if parent_doc else None
+    
+    return {
+        "matches": list(match_ids),
+        "ancestors": list(ancestor_ids - match_ids)
+    }
+
 @app.post("/api/documents", response_model=schemas.DocumentResponse)
 async def create_document(doc: schemas.DocumentCreate, db: AsyncSession = Depends(database.get_db)):
     if doc.parent_id is not None and doc.parent_id <= 0: # Handle possible invalid IDs

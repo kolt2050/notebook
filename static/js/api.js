@@ -46,5 +46,10 @@ const API = {
         const res = await fetch('/api/stats/count');
         const data = await res.json();
         return data.count;
+    },
+
+    async search(query) {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        return res.json();
     }
 };

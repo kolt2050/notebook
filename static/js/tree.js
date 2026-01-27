@@ -31,6 +31,7 @@ const Tree = {
     createItem(item) {
         const li = document.createElement('li');
         li.className = 'tree-item';
+        li.dataset.id = item.id;
 
         const row = document.createElement('div');
         row.className = `tree-row ${this.selectedId === item.id ? 'selected' : ''}`;

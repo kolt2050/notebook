@@ -43,6 +43,37 @@
     border-top: 1px solid var(--border-color);
 }
 
+/* Search box */
+.search-box {
+    padding: 10px 15px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9em;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.search-box input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Search match highlight */
+.search-match>.tree-row .tree-title {
+    background: rgba(255, 193, 7, 0.3);
+    border-radius: 3px;
+    padding: 0 4px;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
