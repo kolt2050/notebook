@@ -5,16 +5,31 @@ const Editor = {
 
     init() {
         document.getElementById('bold-btn').onclick = () => this.format('bold');
-        document.getElementById('h1-btn').onclick = () => this.format('formatBlock', 'H1');
-        document.getElementById('h2-btn').onclick = () => this.format('formatBlock', 'H2');
-        document.getElementById('h3-btn').onclick = () => this.format('formatBlock', 'H3');
-        document.getElementById('img-btn').onclick = () => this.insertImage();
         document.getElementById('delete-btn').onclick = () => this.delete();
+
+        // Support pasting images
+        this.contentArea.onpaste = (e) => this.handlePaste(e);
     },
 
     format(cmd, val) {
         document.execCommand(cmd, false, val);
         this.contentArea.focus();
+    },
+
+
+    handlePaste(e) {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (const item of items) {
+            if (item.type.indexOf('image') !== -1) {
+                const file = item.getAsFile();
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = `<img src="${event.target.result}" alt="Pasted Image">`;
+                    this.format('insertHTML', img);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
     },
 
     insertImage() {
@@ -59,11 +74,11 @@ const Editor = {
 
     async delete() {
         if (!this.currentDoc) return;
-        if (confirm('Delete this document?')) {
+        Modals.show('Delete Document', `<p>Delete "${this.currentDoc.title}"?</p>`, async () => {
             await API.deleteDocument(this.currentDoc.id);
             this.clear();
             Tree.refresh();
-        }
+        }, 'danger');
     }
 };
 

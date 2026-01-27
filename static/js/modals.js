@@ -4,7 +4,7 @@ const Modals = {
     body: document.getElementById('modal-body'),
     confirmBtn: document.getElementById('modal-confirm'),
     cancelBtn: document.getElementById('modal-cancel'),
-
+    modalWindow: document.querySelector('.modal'),
     onConfirm: null,
 
     init() {
@@ -15,10 +15,20 @@ const Modals = {
         };
     },
 
-    show(title, bodyHtml, onConfirm) {
+    show(title, bodyHtml, onConfirm, confirmType = 'primary') {
         this.title.textContent = title;
         this.body.innerHTML = bodyHtml;
         this.onConfirm = onConfirm;
+
+        // Reset classes
+        this.confirmBtn.className = 'btn';
+        this.modalWindow.className = 'modal';
+
+        if (confirmType) {
+            this.confirmBtn.classList.add(confirmType);
+            this.modalWindow.classList.add(confirmType);
+        }
+
         this.container.classList.remove('hidden');
     },
 

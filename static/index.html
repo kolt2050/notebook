@@ -22,6 +22,12 @@
             <div id="tree-container" class="tree-container">
                 <!-- Tree will be rendered here -->
             </div>
+            <div class="sidebar-footer">
+                <div class="stats" style="margin-bottom: 10px; font-size: 0.9em; opacity: 0.7;">
+                    Total documents: <span id="doc-count">0</span>
+                </div>
+                <button id="reset-btn" class="btn danger" style="width: 100%; margin-top: auto;">Reset Notebook</button>
+            </div>
         </aside>
 
         <main class="main-content">
@@ -29,10 +35,6 @@
                 <input type="text" id="doc-title" placeholder="Document Title..." class="title-input">
                 <div class="editor-toolbar">
                     <button id="bold-btn" class="toolbar-btn">B</button>
-                    <button id="h1-btn" class="toolbar-btn">H1</button>
-                    <button id="h2-btn" class="toolbar-btn">H2</button>
-                    <button id="h3-btn" class="toolbar-btn">H3</button>
-                    <button id="img-btn" class="toolbar-btn">🖼️</button>
                     <div class="toolbar-separator"></div>
                     <button id="export-doc-btn" class="toolbar-btn">Export HTML</button>
                     <button id="export-all-btn" class="toolbar-btn">Export All</button>

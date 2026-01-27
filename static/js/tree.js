@@ -5,6 +5,7 @@ const Tree = {
     async refresh() {
         const treeData = await API.getTree();
         this.render(treeData);
+        Main.refreshStats();
     },
 
     render(data) {
@@ -94,13 +95,13 @@ const Tree = {
     },
 
     async deleteItem(item) {
-        if (confirm(`Delete "${item.title}" and all its sub-documents?`)) {
+        Modals.show('Delete Document', `<p>Delete "${item.title}" and all its sub-documents?</p>`, async () => {
             await API.deleteDocument(item.id);
             if (Editor.currentDoc && Editor.currentDoc.id === item.id) {
                 Editor.clear();
             }
             await this.refresh();
-        }
+        }, 'danger');
     },
 
     async renameItem(item) {

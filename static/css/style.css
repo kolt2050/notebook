@@ -12,6 +12,37 @@
     --font-heading: 'Outfit', sans-serif;
 }
 
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 10px;
+    border: 2px solid var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #444;
+}
+
+/* For elements with different backgrounds (like sidebar) */
+.sidebar ::-webkit-scrollbar-thumb {
+    border: 2px solid var(--sidebar-bg);
+}
+
+/* For elements with different backgrounds (like sidebar) */
+.sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -242,8 +273,9 @@ body {
     font-family: var(--font-heading);
 }
 
-.editor-content p {
-    margin-bottom: 15px;
+.editor-content p,
+.editor-content div {
+    margin-bottom: 5px;
 }
 
 .editor-content img {
@@ -273,6 +305,12 @@ body {
     padding: 24px;
     width: 400px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+.modal.danger {
+    background: #2c1a1a;
+    border-color: #e74c3c;
 }
 
 .modal h3 {
@@ -305,6 +343,19 @@ body {
     border-radius: 6px;
     cursor: pointer;
     font-weight: 500;
+    border: none;
+    background: var(--border-color);
+    color: var(--text-color);
+}
+
+.btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn.danger {
+    background: #e74c3c;
+    color: white;
 }
 
 .hidden {

@@ -33,5 +33,18 @@ const API = {
             method: 'DELETE'
         });
         return res.ok;
+    },
+
+    async deleteAllDocuments() {
+        const res = await fetch('/api/danger/all', {
+            method: 'DELETE'
+        });
+        return res.ok;
+    },
+
+    async getDocCount() {
+        const res = await fetch('/api/stats/count');
+        const data = await res.json();
+        return data.count;
     }
 };

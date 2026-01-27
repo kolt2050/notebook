@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete, func
 from typing import List
 from . import models, schemas, database
 from .services import export_service
@@ -40,13 +40,29 @@ async def get_tree(db: AsyncSession = Depends(database.get_db)):
                 parent.children.append(item)
     return tree
 
+@app.get("/api/stats/count")
+async def get_document_count(db: AsyncSession = Depends(database.get_db)):
+    result = await db.execute(select(func.count()).select_from(models.Document))
+    count = result.scalar()
+    return {"count": count}
+
 @app.post("/api/documents", response_model=schemas.DocumentResponse)
 async def create_document(doc: schemas.DocumentCreate, db: AsyncSession = Depends(database.get_db)):
-    new_doc = models.Document(**doc.dict())
-    db.add(new_doc)
+    if doc.parent_id is not None and doc.parent_id <= 0: # Handle possible invalid IDs
+        doc.parent_id = None
+        
+    db_doc = models.Document(**doc.dict())
+    db.add(db_doc)
     await db.commit()
-    await db.refresh(new_doc)
-    return new_doc
+    await db.refresh(db_doc)
+    
+    # Safety check after creation (though ID isn't known before)
+    if db_doc.parent_id == db_doc.id:
+        db_doc.parent_id = None
+        await db.commit()
+        await db.refresh(db_doc)
+        
+    return db_doc
 
 @app.get("/api/documents/{doc_id}", response_model=schemas.DocumentResponse)
 async def get_document(doc_id: int, db: AsyncSession = Depends(database.get_db)):
@@ -64,6 +80,11 @@ async def update_document(doc_id: int, doc_update: schemas.DocumentUpdate, db: A
         raise HTTPException(status_code=404, detail="Document not found")
     
     update_data = doc_update.dict(exclude_unset=True)
+    
+    # Prevent self-referencing
+    if "parent_id" in update_data and update_data["parent_id"] == doc_id:
+        update_data["parent_id"] = None
+
     for key, value in update_data.items():
         setattr(db_doc, key, value)
     
@@ -79,6 +100,13 @@ async def delete_document(doc_id: int, db: AsyncSession = Depends(database.get_d
         raise HTTPException(status_code=404, detail="Document not found")
     
     await db.delete(doc)
+    await db.commit()
+    return None
+
+@app.delete("/api/danger/all", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_all_documents(db: AsyncSession = Depends(database.get_db)):
+    await db.execute(delete(models.Document))
+    await db.execute(delete(models.Image))
     await db.commit()
     return None
 
