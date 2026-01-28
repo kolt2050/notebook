@@ -17,7 +17,7 @@ async def startup():
 # API Endpoints
 @app.get("/api/tree", response_model=List[schemas.TreeItem])
 async def get_tree(db: AsyncSession = Depends(database.get_db)):
-    result = await db.execute(select(models.Document))
+    result = await db.execute(select(models.Document).order_by(models.Document.position, models.Document.id))
     docs = result.scalars().all()
     
     # Build a recursive tree from the flat list manually to avoid lazy-loading issues

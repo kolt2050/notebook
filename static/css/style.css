@@ -251,6 +251,24 @@ body {
     outline: none;
 }
 
+/* Drag & Drop Visual Feedback */
+.tree-row.drag-over-inside {
+    background: rgba(88, 166, 255, 0.2) !important;
+    outline: 2px dashed var(--accent-color);
+}
+
+.tree-row.drag-over-top {
+    border-top: 2px solid var(--accent-color);
+}
+
+.tree-row.drag-over-bottom {
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.tree-item.dragging {
+    opacity: 0.5;
+}
+
 
 /* Main Content */
 .main-content {

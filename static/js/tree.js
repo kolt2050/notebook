@@ -113,6 +113,67 @@ const Tree = {
             }
         };
 
+        // --- Drag & Drop ---
+        li.draggable = true;
+        li.ondragstart = (e) => {
+            e.stopPropagation();
+            this.draggedId = item.id;
+            li.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.id);
+        };
+
+        li.ondragend = (e) => {
+            li.classList.remove('dragging');
+            this.draggedId = null;
+        };
+
+        row.ondragover = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.draggedId === item.id) return;
+
+            const rect = row.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+
+            // Remove previous indicators
+            row.classList.remove('drag-over-inside', 'drag-over-top', 'drag-over-bottom');
+
+            if (y < height * 0.25) {
+                row.classList.add('drag-over-top');
+            } else if (y > height * 0.75) {
+                row.classList.add('drag-over-bottom');
+            } else {
+                row.classList.add('drag-over-inside');
+            }
+        };
+
+        row.ondragleave = (e) => {
+            row.classList.remove('drag-over-inside', 'drag-over-top', 'drag-over-bottom');
+        };
+
+        row.ondrop = async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const draggedId = parseInt(this.draggedId);
+            if (draggedId === item.id) return;
+
+            const rect = row.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const height = rect.height;
+
+            row.classList.remove('drag-over-inside', 'drag-over-top', 'drag-over-bottom');
+
+            if (y < height * 0.25) {
+                await this.moveDocument(draggedId, item.id, 'before');
+            } else if (y > height * 0.75) {
+                await this.moveDocument(draggedId, item.id, 'after');
+            } else {
+                await this.moveDocument(draggedId, item.id, 'inside');
+            }
+        };
+
         if (item.children && item.children.length > 0) {
             const childrenList = this.createList(item.children, false);
             li.appendChild(childrenList);
@@ -201,4 +262,84 @@ const Tree = {
         input.onblur = () => finishRename(true);
         input.onmousedown = (e) => e.stopPropagation(); // Prevent row click
     },
+
+    async moveDocument(draggedId, targetId, type) {
+        // 1. Basic circular check (dropping on self is handled in row.ondrop)
+
+        // 2. Fetch full tree data to check for deep circular dependency
+        const treeData = await API.getTree();
+
+        const isDescendant = (nodes, parentId, childId) => {
+            for (const node of nodes) {
+                if (node.id === parentId) {
+                    return this.containsId(node.children, childId);
+                }
+                const found = isDescendant(node.children, parentId, childId);
+                if (found) return true;
+            }
+            return false;
+        };
+
+        if (this.isDescendantOf(treeData, draggedId, targetId)) {
+            Modals.showInfo('Error', 'Cannot move a document into its own sub-document.');
+            return;
+        }
+
+        // 3. Get target document details
+        const allDocs = this.flattenTree(treeData);
+        const targetDoc = allDocs.find(d => d.id === targetId);
+        if (!targetDoc) return;
+
+        let newParentId = null;
+        let newPosition = 0;
+
+        if (type === 'inside') {
+            newParentId = targetId;
+            newPosition = 0; // Top of the list
+        } else {
+            newParentId = targetDoc.parent_id;
+            newPosition = type === 'before' ? targetDoc.position : targetDoc.position + 1;
+        }
+
+        try {
+            await API.updateDocument(draggedId, {
+                parent_id: newParentId,
+                position: newPosition
+            });
+            await this.refresh();
+        } catch (err) {
+            console.error('Move failed:', err);
+            Modals.showInfo('Error', 'Failed to move document');
+        }
+    },
+
+    // Helper: check if targetId is inside the subtree of parentId
+    isDescendantOf(nodes, parentId, targetId) {
+        for (const node of nodes) {
+            if (node.id === parentId) {
+                return this.containsId(node.children, targetId);
+            }
+            if (this.isDescendantOf(node.children, parentId, targetId)) return true;
+        }
+        return false;
+    },
+
+    containsId(nodes, targetId) {
+        for (const node of nodes) {
+            if (node.id === targetId) return true;
+            if (this.containsId(node.children, targetId)) return true;
+        }
+        return false;
+    },
+
+    flattenTree(nodes) {
+        let result = [];
+        for (const node of nodes) {
+            result.push({ id: node.id, parent_id: node.parent_id, position: node.position });
+            if (node.children) {
+                result = result.concat(this.flattenTree(node.children));
+            }
+        }
+        return result;
+    }
 };
