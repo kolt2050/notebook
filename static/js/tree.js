@@ -12,6 +12,19 @@ const Tree = {
         if (searchInput && searchInput.value) {
             Main.handleSearch(searchInput.value);
         }
+
+        // Add container click for deselection
+        this.container.onclick = (e) => {
+            if (e.target === this.container) {
+                this.deselect();
+            }
+        };
+    },
+
+    deselect() {
+        this.selectedId = null;
+        Editor.clear();
+        this.refresh();
     },
 
     render(data) {
@@ -50,18 +63,23 @@ const Tree = {
         const title = document.createElement('span');
         title.className = 'tree-title';
         title.textContent = item.title;
+        title.ondblclick = (e) => {
+            e.stopPropagation();
+            this.renameItem(item);
+        };
 
         const actions = document.createElement('div');
         actions.className = 'tree-actions';
 
-        const renameBtn = document.createElement('button');
-        renameBtn.className = 'tree-action-btn';
-        renameBtn.textContent = '✏️';
-        renameBtn.title = 'Rename';
-        renameBtn.onclick = (e) => {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'tree-action-btn';
+        addBtn.textContent = '➕';
+        addBtn.title = 'Add Sub-document';
+        addBtn.onclick = (e) => {
             e.stopPropagation();
-            this.renameItem(item);
+            Main.addNew(item.id);
         };
+
 
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'tree-action-btn';
@@ -72,7 +90,7 @@ const Tree = {
             this.deleteItem(item);
         };
 
-        actions.appendChild(renameBtn);
+        actions.appendChild(addBtn);
         actions.appendChild(deleteBtn);
 
         row.appendChild(icon);
@@ -81,10 +99,19 @@ const Tree = {
         li.appendChild(row);
 
         row.onmousedown = (e) => {
-            e.preventDefault(); // Prevent focus loss interference
+            // If click is on an action button, don't select the item
+            if (e.target.closest('.tree-actions')) {
+                return;
+            }
+            e.preventDefault();
             e.stopPropagation();
-            Editor.save(); // Manually save current document since blur won't fire
-            this.selectItem(item);
+
+            if (e.detail === 2) {
+                this.renameItem(item);
+            } else {
+                Editor.save();
+                this.selectItem(item);
+            }
         };
 
         if (item.children && item.children.length > 0) {
@@ -96,8 +123,18 @@ const Tree = {
     },
 
     async selectItem(item) {
+        // Update selected state in DOM without full refresh
+        const oldSelected = this.container.querySelector('.tree-row.selected');
+        if (oldSelected) {
+            oldSelected.classList.remove('selected');
+        }
+
+        const newSelected = this.container.querySelector(`.tree-row[data-id="${item.id}"]`);
+        if (newSelected) {
+            newSelected.classList.add('selected');
+        }
+
         this.selectedId = item.id;
-        Tree.refresh();
 
         const fullDoc = await API.getDocument(item.id);
         Editor.load(fullDoc);
@@ -114,14 +151,55 @@ const Tree = {
     },
 
     async renameItem(item) {
-        const bodyHtml = `<input type="text" id="rename-title" value="${item.title}">`;
-        Modals.show('Rename', bodyHtml, async () => {
-            const newTitle = document.getElementById('rename-title').value;
-            await API.updateDocument(item.id, { title: newTitle });
-            await this.refresh();
-            if (Editor.currentDoc && Editor.currentDoc.id === item.id) {
-                Editor.titleInput.value = newTitle;
+        const titleSpan = document.querySelector(`li[data-id="${item.id}"] .tree-title`);
+        if (!titleSpan) return;
+
+        const originalTitle = item.title;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = originalTitle;
+        input.className = 'tree-rename-input';
+
+        titleSpan.innerHTML = '';
+        titleSpan.appendChild(input);
+        input.focus();
+        input.select();
+
+        let finished = false;
+        const finishRename = async (save) => {
+            if (finished) return;
+            finished = true;
+
+            const newTitle = input.value.trim();
+            if (save && newTitle && newTitle !== originalTitle) {
+                try {
+                    await API.updateDocument(item.id, { title: newTitle });
+                    // Refresh will update the tree and the editor title if needed
+                    await this.refresh();
+                    if (Editor.currentDoc && Editor.currentDoc.id === item.id) {
+                        Editor.titleInput.value = newTitle;
+                    }
+                } catch (err) {
+                    console.error('Rename failed:', err);
+                    titleSpan.textContent = originalTitle;
+                }
+            } else {
+                titleSpan.textContent = originalTitle;
             }
-        });
-    }
+        };
+
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.stopPropagation();
+                finishRename(true);
+            }
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                finishRename(false);
+            }
+        };
+        input.onblur = () => finishRename(true);
+        input.onmousedown = (e) => e.stopPropagation(); // Prevent row click
+    },
 };

@@ -5,6 +5,7 @@ const Editor = {
 
     init() {
         document.getElementById('bold-btn').onclick = () => this.format('bold');
+        document.getElementById('remove-format-btn').onclick = () => this.format('removeFormat');
         document.getElementById('delete-btn').onclick = () => this.delete();
 
         // Support pasting images
@@ -12,16 +13,37 @@ const Editor = {
     },
 
     format(cmd, val) {
-        document.execCommand(cmd, false, val);
+        if (cmd === 'removeFormat') {
+            document.execCommand('removeFormat', false, val);
+            // Further clean up: remove all 'style' attributes from elements in selection
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            const container = range.commonAncestorContainer;
+            const elements = (container.nodeType === 1 ? [container] : []).concat(
+                Array.from((container.nodeType === 1 ? container : container.parentNode).querySelectorAll('*'))
+            );
+
+            elements.forEach(el => {
+                if (selection.containsNode(el, true)) {
+                    el.removeAttribute('style');
+                }
+            });
+        } else {
+            document.execCommand(cmd, false, val);
+        }
         this.contentArea.focus();
     },
 
 
     handlePaste(e) {
-        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        const clipboardData = e.clipboardData || window.clipboardData;
+        const items = clipboardData.items;
+
+        // Check for images first
         for (const item of items) {
             if (item.type.indexOf('image') !== -1) {
-                e.preventDefault(); // Prevent browser's default paste behavior
+                e.preventDefault();
                 const file = item.getAsFile();
                 const reader = new FileReader();
                 reader.onload = (event) => {
@@ -29,9 +51,14 @@ const Editor = {
                     this.format('insertHTML', img);
                 };
                 reader.readAsDataURL(file);
-                return; // Exit after handling image
+                return;
             }
         }
+
+        // Handle text paste (force plain text)
+        e.preventDefault();
+        const text = clipboardData.getData('text/plain');
+        this.format('insertText', text);
     },
 
     insertImage() {

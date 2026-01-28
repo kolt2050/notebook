@@ -16,10 +16,24 @@ const Main = {
 
         // Search with debounce
         const searchInput = document.getElementById('search-input');
+        const searchClear = document.getElementById('search-clear');
         let searchTimeout;
+
+        const updateClearVisibility = () => {
+            searchClear.style.display = searchInput.value ? 'block' : 'none';
+        };
+
         searchInput.oninput = () => {
+            updateClearVisibility();
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => this.handleSearch(searchInput.value), 300);
+        };
+
+        searchClear.onclick = () => {
+            searchInput.value = '';
+            updateClearVisibility();
+            this.handleSearch('');
+            searchInput.focus();
         };
 
         // Auto-save on blur
@@ -49,21 +63,22 @@ const Main = {
         }
     },
 
-    addNew() {
-        const bodyHtml = `<input type="text" id="new-item-title" placeholder="Title..." value="New Document">`;
-
-        Modals.show(`Create Document`, bodyHtml, async () => {
-            const newTitle = document.getElementById('new-item-title').value;
-            const parentId = Tree.selectedId;
-
+    async addNew(parentId = null) {
+        try {
             const newItem = await API.createDocument({
-                title: newTitle,
+                title: "New Document",
                 is_folder: 0,
                 parent_id: parentId
             });
             await Tree.refresh();
-            Tree.selectItem(newItem);
-        });
+            await Tree.selectItem(newItem);
+
+            // Focus title and select text for quick renaming
+            Editor.titleInput.focus();
+            Editor.titleInput.select();
+        } catch (err) {
+            console.error('Failed to create document:', err);
+        }
     },
 
     async exportCurrent() {
@@ -207,10 +222,16 @@ const Main = {
         const allItems = treeContainer.querySelectorAll('li[data-id]');
 
         // If query is empty, show all
+        // If query is empty, show all and clear highlights
         if (query.length < 1) {
             allItems.forEach(li => {
                 li.style.display = '';
                 li.classList.remove('search-match');
+                const titleSpan = li.querySelector('.tree-title');
+                if (titleSpan && titleSpan.dataset.original) {
+                    titleSpan.textContent = titleSpan.dataset.original;
+                    delete titleSpan.dataset.original;
+                }
             });
             Editor.applyHighlight('');
             return;
