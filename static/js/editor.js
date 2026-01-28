@@ -103,12 +103,29 @@ const Editor = {
         // Remove highlights before saving
         this.removeHighlights();
 
+        const newTitle = this.titleInput.value.trim();
+        const newContent = this.contentArea.innerHTML;
+
+        // Don't save if nothing changed
+        if (newTitle === this.currentDoc.title && newContent === this.currentDoc.content) {
+            return;
+        }
+
         const data = {
-            title: this.titleInput.value,
-            content: this.contentArea.innerHTML
+            title: newTitle,
+            content: newContent
         };
+
         await API.updateDocument(this.currentDoc.id, data);
-        Tree.refresh();
+
+        // Only refresh tree if title changed
+        if (newTitle !== this.currentDoc.title) {
+            await Tree.refresh();
+        }
+
+        // Update local reference
+        this.currentDoc.title = newTitle;
+        this.currentDoc.content = newContent;
 
         // Restore highlights if there's an active search
         const searchInput = document.getElementById('search-input');

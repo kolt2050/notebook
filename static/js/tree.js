@@ -103,7 +103,6 @@ const Tree = {
             if (e.target.closest('.tree-actions')) {
                 return;
             }
-            e.preventDefault();
             e.stopPropagation();
 
             if (e.detail === 2) {
