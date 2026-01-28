@@ -30,6 +30,7 @@ const Main = {
         document.getElementById('export-doc-btn').onclick = () => this.exportCurrent();
         document.getElementById('export-all-btn').onclick = () => this.exportAll();
         document.getElementById('import-btn').onclick = () => this.showImport();
+        document.getElementById('import-cherry-btn').onclick = () => this.showImportCherryTree();
 
         const resetBtn = document.getElementById('reset-btn');
         if (resetBtn) {
@@ -211,25 +212,130 @@ const Main = {
                 li.style.display = '';
                 li.classList.remove('search-match');
             });
+            Editor.applyHighlight('');
             return;
         }
 
         // Get matching IDs from server
         const result = await API.search(query);
-        console.log('[Search] Query:', query, 'Result:', result);
         const visibleIds = new Set([...result.matches, ...result.ancestors]);
 
-        // Filter tree
+        // Highlight pattern in editor if document is open
+        Editor.applyHighlight(query);
+
+        // Filter tree and highlight pattern
         allItems.forEach(li => {
             const id = parseInt(li.dataset.id);
+            const titleSpan = li.querySelector('.tree-title');
+
+            // Revert to original title first
+            if (titleSpan.dataset.original) {
+                titleSpan.textContent = titleSpan.dataset.original;
+            }
+
             if (visibleIds.has(id)) {
                 li.style.display = '';
-                li.classList.toggle('search-match', result.matches.includes(id));
+                const isMatch = result.matches.includes(id);
+                li.classList.toggle('search-match', isMatch);
+
+                if (isMatch) {
+                    // Save original if not saved
+                    if (!titleSpan.dataset.original) {
+                        titleSpan.dataset.original = titleSpan.textContent;
+                    }
+                    // Highlight pattern
+                    const text = titleSpan.dataset.original;
+                    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`(${escaped})`, 'gi');
+                    titleSpan.innerHTML = text.replace(regex, '<mark>$1</mark>');
+                }
             } else {
                 li.style.display = 'none';
                 li.classList.remove('search-match');
             }
         });
+    },
+
+    showImportCherryTree() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.html';
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const text = event.target.result;
+                    await this.importCherryTree(text);
+                    await Tree.refresh();
+                    alert('Import successful!');
+                } catch (err) {
+                    console.error('Import failed:', err);
+                    alert('Import failed: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    },
+
+    async importCherryTree(htmlContent) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        // CherryTree export uses div.page for each node
+        const pages = doc.querySelectorAll('div.page');
+
+        // Stack to keep track of parent IDs for levels
+        // index corresponds to level. level 1 -> index 1 (parent is null)
+        const parentStack = {};
+
+        for (const page of pages) {
+            // Find h1 with class 'title level-X'
+            const h1 = page.querySelector('h1.title');
+            if (!h1) continue;
+
+            const title = h1.textContent.trim();
+
+            // Extract level from class "level-1", "level-2", etc.
+            let level = 1;
+            const levelClass = Array.from(h1.classList).find(cls => cls.startsWith('level-'));
+            if (levelClass) {
+                level = parseInt(levelClass.split('-')[1]);
+            }
+
+            // Extract content: everything in the div after the h1
+            // Use a temporary div to gather content nodes
+            const contentDiv = document.createElement('div');
+            let sibling = h1.nextSibling;
+            while (sibling) {
+                contentDiv.appendChild(sibling.cloneNode(true));
+                sibling = sibling.nextSibling;
+            }
+            const content = contentDiv.innerHTML;
+
+            // Determine parent_id
+            // Level 1 has no parent (null). Level 2 uses parentStack[1], etc.
+            const parentId = level > 1 ? parentStack[level - 1] : null;
+
+            try {
+                const newItem = await API.createDocument({
+                    title: title,
+                    content: content,
+                    is_folder: 0,
+                    parent_id: parentId
+                });
+
+                // Store current ID for children (next level)
+                parentStack[level] = newItem.id;
+                console.log(`[CherryTree] Imported: ${title} (Level ${level}) -> ID: ${newItem.id}, Parent: ${parentId}`);
+
+            } catch (err) {
+                console.error(`[CherryTree] Failed to import: ${title}`, err);
+            }
+        }
     },
 
     downloadFile(filename, text) {

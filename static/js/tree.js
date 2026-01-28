@@ -6,6 +6,12 @@ const Tree = {
         const treeData = await API.getTree();
         this.render(treeData);
         Main.refreshStats();
+
+        // Re-apply search if search input has value
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && searchInput.value) {
+            Main.handleSearch(searchInput.value);
+        }
     },
 
     render(data) {

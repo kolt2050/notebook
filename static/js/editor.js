@@ -55,6 +55,12 @@ const Editor = {
         this.titleInput.value = doc.title;
         this.contentArea.innerHTML = doc.content || '';
         this.contentArea.setAttribute('placeholder', 'Type something...');
+
+        // Highlight search pattern if active
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && searchInput.value) {
+            this.applyHighlight(searchInput.value);
+        }
     },
 
     clear() {
@@ -66,12 +72,69 @@ const Editor = {
 
     async save() {
         if (!this.currentDoc) return;
+
+        // Remove highlights before saving
+        this.removeHighlights();
+
         const data = {
             title: this.titleInput.value,
             content: this.contentArea.innerHTML
         };
         await API.updateDocument(this.currentDoc.id, data);
         Tree.refresh();
+
+        // Restore highlights if there's an active search
+        const searchInput = document.getElementById('search-input');
+        if (searchInput && searchInput.value) {
+            this.applyHighlight(searchInput.value);
+        }
+    },
+
+    removeHighlights() {
+        const highlights = this.contentArea.querySelectorAll('mark.search-highlight');
+        highlights.forEach(mark => {
+            const parent = mark.parentNode;
+            while (mark.firstChild) {
+                parent.insertBefore(mark.firstChild, mark);
+            }
+            parent.removeChild(mark);
+        });
+        this.contentArea.normalize();
+    },
+
+    applyHighlight(query) {
+        this.removeHighlights();
+        if (!query || query.length < 1) return;
+
+        const walker = document.createTreeWalker(this.contentArea, NodeFilter.SHOW_TEXT, null, false);
+        const nodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+            nodes.push(node);
+        }
+
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escaped})`, 'gi');
+
+        nodes.forEach(textNode => {
+            const val = textNode.nodeValue;
+            regex.lastIndex = 0;
+            if (regex.test(val)) {
+                const fragment = document.createDocumentFragment();
+                let lastIdx = 0;
+                val.replace(regex, (match, p1, offset) => {
+                    fragment.appendChild(document.createTextNode(val.substring(lastIdx, offset)));
+                    const mark = document.createElement('mark');
+                    mark.className = 'search-highlight';
+                    mark.textContent = match;
+                    fragment.appendChild(mark);
+                    lastIdx = offset + match.length;
+                    return match;
+                });
+                fragment.appendChild(document.createTextNode(val.substring(lastIdx)));
+                textNode.parentNode.replaceChild(fragment, textNode);
+            }
+        });
     },
 
     async delete() {
