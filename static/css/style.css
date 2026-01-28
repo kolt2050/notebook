@@ -385,7 +385,12 @@ body {
 
 .editor-content p,
 .editor-content div {
-    margin: 0 !important;
+    margin-bottom: 0.8em !important;
+}
+
+.editor-content p:last-child,
+.editor-content div:last-child {
+    margin-bottom: 0 !important;
 }
 
 .editor-content img {

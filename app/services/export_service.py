@@ -19,7 +19,24 @@ async def export_all_to_markdown(db: AsyncSession) -> str:
     
     # Unordered list of documents, hierarchy is preserved in metadata
     for doc in docs:
-        markdown_text = h.handle(doc.content or "")
+        content = doc.content or ""
+        
+        # Protect <img> tags with style attributes (to preserve resized dimensions)
+        protected_imgs = []
+        def protect_img(match):
+            placeholder = f"---IMG_PROTECT_{len(protected_imgs)}---"
+            protected_imgs.append(match.group(0))
+            return placeholder
+        
+        # Protect images with style OR width/height attributes
+        content_with_placeholders = re.sub(r'<img[^>]+(?:style|width|height)=[^>]+>', protect_img, content)
+        
+        markdown_text = h.handle(content_with_placeholders)
+        
+        # Restore protected images, isolating them on their own lines for correct Markdown parsing
+        for i, img_tag in enumerate(protected_imgs):
+            placeholder = f"---IMG_PROTECT_{i}---"
+            markdown_text = markdown_text.replace(placeholder, f"\n\n{img_tag}\n\n")
         
         # Clean up empty bold/italic markers like **, __, * *, etc.
         # These are often generated from <p><strong><br></strong></p> in contenteditable

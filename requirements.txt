@@ -6,3 +6,6 @@ python-multipart
 pydantic
 pydantic-settings
 html2text
+pytest
+pytest-asyncio
+httpx

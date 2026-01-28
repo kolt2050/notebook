@@ -14,11 +14,30 @@ const Main = {
                         return content.trim() ? '**' + content + '**' : content;
                     }
                 });
+
+                // Add rule to preserve images with custom dimensions/styles
+                this.turndown.addRule('preserveResizedImages', {
+                    filter: function (node) {
+                        return node.nodeName === 'IMG' && (node.getAttribute('style') || node.getAttribute('width'));
+                    },
+                    replacement: function (content, node) {
+                        return node.outerHTML;
+                    }
+                });
             } else {
                 console.warn('TurndownService not found, Markdown export will be limited.');
             }
+
+            if (typeof marked !== 'undefined') {
+                marked.setOptions({
+                    headerIds: false,
+                    mangle: false,
+                    gfm: true,
+                    breaks: true
+                });
+            }
         } catch (e) {
-            console.error('Failed to init Turndown:', e);
+            console.error('Failed to init converters:', e);
         }
 
         try {
@@ -179,17 +198,19 @@ const Main = {
                                 const contentStart = docStr.indexOf(metadataMatch[0]) + metadataMatch[0].length;
                                 let rawContent = docStr.substring(contentStart).trim();
 
-                                // Pre-process: convert whitespace-only lines to visible breaks
-                                // Lines with only spaces (like "  ") become <br> for visual spacing
-                                let processedContent = rawContent
-                                    .split('\n')
-                                    .map(line => line.trim() === '' ? '<br>' : line)
-                                    .join('\n');
+                                // Preserve empty lines: replace sequences of 2+ newlines with paragraph breaks
+                                let processedContent = rawContent.replace(/\n\n+/g, '\n\n<br>\n\n');
 
                                 if (typeof marked === 'undefined') {
                                     throw new Error('Markdown parser (marked) not loaded.');
                                 }
-                                const htmlContent = marked.parse(processedContent);
+                                let htmlContent = marked.parse(processedContent);
+                                // Fix escaped <img> tags that marked may have converted to &lt;img...&gt;
+                                htmlContent = htmlContent.replace(/&lt;img\s+([^&]*?)&gt;/gi, (match, attrs) => {
+                                    // Decode HTML entities in attributes
+                                    const decoded = attrs.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+                                    return '<img ' + decoded + '>';
+                                });
 
                                 const newItem = await API.createDocument({
                                     title: title,
@@ -247,15 +268,18 @@ const Main = {
                         let content = "";
 
                         if (file.name.endsWith('.md')) {
-                            // Pre-process: convert whitespace-only lines to visible breaks
-                            let processedContent = text
-                                .split('\n')
-                                .map(line => line.trim() === '' ? '<br>' : line)
-                                .join('\n');
+                            // Preserve empty lines: replace sequences of 2+ newlines with paragraph breaks
+                            let processedContent = text.replace(/\n\n+/g, '\n\n<br>\n\n');
                             if (typeof marked === 'undefined') {
                                 throw new Error('Markdown parser (marked) not loaded.');
                             }
                             content = marked.parse(processedContent);
+                            // Fix escaped <img> tags that marked may have converted to &lt;img...&gt;
+                            content = content.replace(/&lt;img\s+([^&]*?)&gt;/gi, (match, attrs) => {
+                                // Decode HTML entities in attributes
+                                const decoded = attrs.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+                                return '<img ' + decoded + '>';
+                            });
                             const titleMatch = text.match(/^# (.*)$/m);
                             if (titleMatch) title = titleMatch[1].trim();
                         } else {

@@ -12,7 +12,7 @@ const Editor = {
         this.contentArea.onpaste = (e) => this.handlePaste(e);
 
         // Initialize resizer
-        ImageResizer.init(this.contentArea);
+        ImageResizer.init(this);
     },
 
     format(cmd, val) {
@@ -209,7 +209,7 @@ const ImageResizer = {
 
     init(editor) {
         this.editor = editor;
-        this.editor.addEventListener('click', (e) => {
+        this.editor.contentArea.addEventListener('click', (e) => {
             if (e.target.tagName === 'IMG') {
                 this.selectImage(e.target);
             } else if (!e.target.classList.contains('img-resize-handle')) {
@@ -218,7 +218,7 @@ const ImageResizer = {
         });
 
         // Hide handles on scroll or window resize
-        this.editor.addEventListener('scroll', () => this.updateHandlePositions());
+        this.editor.contentArea.addEventListener('scroll', () => this.updateHandlePositions());
         window.addEventListener('resize', () => this.updateHandlePositions());
 
         // Global mouse events for resizing
