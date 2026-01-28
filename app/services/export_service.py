@@ -6,7 +6,7 @@ import html2text
 import re
 
 async def export_all_to_markdown(db: AsyncSession) -> str:
-    result = await db.execute(select(models.Document))
+    result = await db.execute(select(models.Document).order_by(models.Document.position, models.Document.id))
     docs = result.scalars().all()
     
     # Initialize html2text converter
@@ -32,7 +32,8 @@ async def export_all_to_markdown(db: AsyncSession) -> str:
         metadata = {
             "id": doc.id,
             "parent_id": doc.parent_id,
-            "title": doc.title
+            "title": doc.title,
+            "position": doc.position
         }
         md_content += f"<!-- notebook-metadata: {json.dumps(metadata)} -->\n\n"
         md_content += f"{markdown_text}\n\n"

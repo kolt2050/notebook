@@ -1,6 +1,7 @@
 const API = {
     async getTree() {
         const res = await fetch('/api/tree');
+        if (!res.ok) throw new Error('Failed to fetch tree');
         return res.json();
     },
 
@@ -16,6 +17,10 @@ const API = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to create document');
+        }
         return res.json();
     },
 
@@ -25,6 +30,10 @@ const API = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to update document');
+        }
         return res.json();
     },
 

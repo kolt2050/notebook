@@ -26,6 +26,7 @@ async def get_tree(db: AsyncSession = Depends(database.get_db)):
         title=doc.title,
         is_folder=doc.is_folder,
         parent_id=doc.parent_id,
+        position=doc.position,
         children=[]
     ) for doc in docs}
     

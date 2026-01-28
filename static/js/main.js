@@ -186,13 +186,17 @@ const Main = {
                                     .map(line => line.trim() === '' ? '<br>' : line)
                                     .join('\n');
 
+                                if (typeof marked === 'undefined') {
+                                    throw new Error('Markdown parser (marked) not loaded.');
+                                }
                                 const htmlContent = marked.parse(processedContent);
 
                                 const newItem = await API.createDocument({
                                     title: title,
                                     content: htmlContent,
                                     is_folder: 0,
-                                    parent_id: null
+                                    parent_id: null,
+                                    position: metadata.position || 0
                                 });
                                 idMap[metadata.id] = newItem.id;
                                 if (metadata.parent_id) {
@@ -248,6 +252,9 @@ const Main = {
                                 .split('\n')
                                 .map(line => line.trim() === '' ? '<br>' : line)
                                 .join('\n');
+                            if (typeof marked === 'undefined') {
+                                throw new Error('Markdown parser (marked) not loaded.');
+                            }
                             content = marked.parse(processedContent);
                             const titleMatch = text.match(/^# (.*)$/m);
                             if (titleMatch) title = titleMatch[1].trim();
@@ -274,7 +281,7 @@ const Main = {
                     await Tree.refresh();
                 } catch (err) {
                     console.error('Import failed:', err);
-                    Modals.showInfo('Import Failed', 'Failed to import documents');
+                    Modals.showInfo('Import Failed', `Failed to import documents: ${err.message}`);
                 }
             };
             reader.readAsText(file);
