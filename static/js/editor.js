@@ -10,6 +10,9 @@ const Editor = {
 
         // Support pasting images
         this.contentArea.onpaste = (e) => this.handlePaste(e);
+
+        // Initialize resizer
+        ImageResizer.init(this.contentArea);
     },
 
     format(cmd, val) {
@@ -78,6 +81,7 @@ const Editor = {
     },
 
     load(doc) {
+        ImageResizer.deselect();
         this.currentDoc = doc;
         this.titleInput.value = doc.title;
         this.contentArea.innerHTML = doc.content || '';
@@ -91,6 +95,7 @@ const Editor = {
     },
 
     clear() {
+        ImageResizer.deselect();
         this.currentDoc = null;
         this.titleInput.value = '';
         this.contentArea.innerHTML = '';
@@ -188,6 +193,130 @@ const Editor = {
             this.clear();
             Tree.refresh();
         }, 'danger');
+    }
+};
+
+const ImageResizer = {
+    editor: null,
+    activeImg: null,
+    handles: [],
+    isResizing: false,
+    startWidth: 0,
+    startHeight: 0,
+    startX: 0,
+    startY: 0,
+    aspectRatio: 1,
+
+    init(editor) {
+        this.editor = editor;
+        this.editor.addEventListener('click', (e) => {
+            if (e.target.tagName === 'IMG') {
+                this.selectImage(e.target);
+            } else if (!e.target.classList.contains('img-resize-handle')) {
+                this.deselect();
+            }
+        });
+
+        // Hide handles on scroll or window resize
+        this.editor.addEventListener('scroll', () => this.updateHandlePositions());
+        window.addEventListener('resize', () => this.updateHandlePositions());
+
+        // Global mouse events for resizing
+        document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        document.addEventListener('mouseup', () => this.handleMouseUp());
+    },
+
+    selectImage(img) {
+        if (this.activeImg === img) return;
+        this.deselect();
+        this.activeImg = img;
+        this.activeImg.classList.add('selected-for-resize');
+        this.createHandles();
+    },
+
+    deselect() {
+        if (this.activeImg) {
+            this.activeImg.classList.remove('selected-for-resize');
+            this.activeImg = null;
+        }
+        this.removeHandles();
+    },
+
+    createHandles() {
+        const positions = ['nw', 'ne', 'sw', 'se'];
+        positions.forEach(pos => {
+            const handle = document.createElement('div');
+            handle.className = `img-resize-handle ${pos}`;
+            handle.onmousedown = (e) => this.handleMouseDown(e, pos);
+            document.body.appendChild(handle);
+            this.handles.push(handle);
+        });
+        this.updateHandlePositions();
+    },
+
+    removeHandles() {
+        this.handles.forEach(h => h.remove());
+        this.handles = [];
+    },
+
+    updateHandlePositions() {
+        if (!this.activeImg) return;
+        const rect = this.activeImg.getBoundingClientRect();
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+
+        const hRects = {
+            nw: { top: rect.top + scrollY, left: rect.left + scrollX },
+            ne: { top: rect.top + scrollY, left: rect.right + scrollX },
+            sw: { top: rect.bottom + scrollY, left: rect.left + scrollX },
+            se: { top: rect.bottom + scrollY, left: rect.right + scrollX }
+        };
+
+        this.handles.forEach(h => {
+            const pos = h.classList.contains('nw') ? 'nw' :
+                h.classList.contains('ne') ? 'ne' :
+                    h.classList.contains('sw') ? 'sw' : 'se';
+            const p = hRects[pos];
+            h.style.top = `${p.top - 6}px`;
+            h.style.left = `${p.left - 6}px`;
+        });
+    },
+
+    handleMouseDown(e, pos) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.isResizing = true;
+        this.startX = e.clientX;
+        this.startY = e.clientY;
+        this.startWidth = this.activeImg.offsetWidth;
+        this.startHeight = this.activeImg.offsetHeight;
+        this.aspectRatio = this.startWidth / this.startHeight;
+    },
+
+    handleMouseMove(e) {
+        if (!this.isResizing || !this.activeImg) return;
+
+        const deltaX = e.clientX - this.startX;
+        let newWidth = this.startWidth + deltaX;
+
+        // Clamp min size
+        if (newWidth < 20) newWidth = 20;
+
+        // Proportional height
+        const newHeight = newWidth / this.aspectRatio;
+
+        this.activeImg.style.width = `${newWidth}px`;
+        this.activeImg.style.height = `${newHeight}px`;
+
+        this.updateHandlePositions();
+    },
+
+    handleMouseUp() {
+        if (this.isResizing) {
+            this.isResizing = false;
+            // Trigger save after resize
+            Editor.save();
+        }
     }
 };
 
