@@ -327,6 +327,10 @@ body {
     color: var(--danger-color);
 }
 
+#delete-btn {
+    margin-left: auto;
+}
+
 .toolbar-separator {
     width: 1px;
     height: 20px;

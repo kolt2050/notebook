@@ -29,6 +29,12 @@
                 <!-- Tree will be rendered here -->
             </div>
             <div class="sidebar-footer">
+                <div class="sidebar-footer-actions" style="display: flex; gap: 8px; margin-bottom: 15px;">
+                    <button id="export-all-btn" class="btn secondary"
+                        style="flex: 1; font-size: 0.85em; padding: 6px;">Export All</button>
+                    <button id="import-btn" class="btn secondary"
+                        style="flex: 1; font-size: 0.85em; padding: 6px;">Import</button>
+                </div>
                 <div class="stats" style="margin-bottom: 10px; font-size: 0.9em; opacity: 0.7;">
                     Total documents: <span id="doc-count">0</span>
                 </div>
@@ -44,10 +50,7 @@
                     <button id="remove-format-btn" class="toolbar-btn" title="Clear all formatting">Clear
                         format</button>
                     <div class="toolbar-separator"></div>
-                    <button id="export-doc-btn" class="toolbar-btn">Export Markdown</button>
-                    <button id="export-all-btn" class="toolbar-btn">Export All (MD)</button>
-                    <button id="import-btn" class="toolbar-btn">Import</button>
-
+                    <button id="export-doc-btn" class="toolbar-btn">Export to Markdown</button>
                     <button id="delete-btn" class="toolbar-btn danger">Delete</button>
                 </div>
             </header>
