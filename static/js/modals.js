@@ -15,7 +15,7 @@ const Modals = {
         };
     },
 
-    show(title, bodyHtml, onConfirm, confirmType = 'primary') {
+    show(title, bodyHtml, onConfirm, confirmType = 'primary', showCancel = true) {
         this.title.textContent = title;
         this.body.innerHTML = bodyHtml;
         this.onConfirm = onConfirm;
@@ -29,7 +29,21 @@ const Modals = {
             this.modalWindow.classList.add(confirmType);
         }
 
+        if (showCancel) {
+            this.cancelBtn.classList.remove('hidden');
+        } else {
+            this.cancelBtn.classList.add('hidden');
+        }
+
         this.container.classList.remove('hidden');
+    },
+
+    showInfo(title, message, onConfirm) {
+        this.show(title, `<p>${message}</p>`, onConfirm, 'primary', false);
+    },
+
+    showConfirm(title, message, onConfirm, confirmType = 'primary') {
+        this.show(title, `<p>${message}</p>`, onConfirm, confirmType, true);
     },
 
     hide() {

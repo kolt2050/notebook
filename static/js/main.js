@@ -1,6 +1,27 @@
 const Main = {
     async init() {
         try {
+            if (typeof TurndownService !== 'undefined') {
+                this.turndown = new TurndownService({
+                    headingStyle: 'atx',
+                    codeBlockStyle: 'fenced'
+                });
+
+                // Add rule to skip empty bold/italic tags that cause ** on empty lines
+                this.turndown.addRule('skipEmptyEmphasis', {
+                    filter: ['strong', 'b', 'em', 'i'],
+                    replacement: function (content) {
+                        return content.trim() ? '**' + content + '**' : content;
+                    }
+                });
+            } else {
+                console.warn('TurndownService not found, Markdown export will be limited.');
+            }
+        } catch (e) {
+            console.error('Failed to init Turndown:', e);
+        }
+
+        try {
             await Tree.refresh();
         } catch (err) {
             console.error('Failed to load tree:', err);
@@ -9,6 +30,12 @@ const Main = {
         // Add event listeners
         this.addEventListeners();
         this.refreshStats();
+
+        // Auto-save every 5 minutes
+        setInterval(() => {
+            console.log('[Auto-save] Periodic trigger');
+            Editor.save();
+        }, 5 * 60 * 1000);
     },
 
     addEventListeners() {
@@ -82,29 +109,35 @@ const Main = {
     },
 
     async exportCurrent() {
-        if (!Editor.currentDoc) return;
-        const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>${Editor.currentDoc.title}</title>
-</head>
-<body>
-    <h1>${Editor.currentDoc.title}</h1>
-    ${Editor.contentArea.innerHTML}
-</body>
-</html>`;
-        this.downloadFile(`${Editor.currentDoc.title}.html`, htmlContent);
+        if (!Editor.currentDoc) {
+            Modals.showInfo('Notice', 'Please select a document first.');
+            return;
+        }
+        if (!this.turndown) {
+            Modals.showInfo('Error', 'Markdown converter not loaded. Please check your connection.');
+            return;
+        }
+        const md = this.turndown.turndown(Editor.contentArea.innerHTML);
+        const fileName = `${Editor.currentDoc.title}.md`;
+        this.downloadFile(fileName, md);
     },
 
     async exportAll() {
-        window.location.href = '/api/export/all';
+        try {
+            const response = await fetch('/api/export/all');
+            if (!response.ok) throw new Error('Export failed');
+            const md = await response.text();
+            this.downloadFile('notebook_export.md', md);
+        } catch (err) {
+            console.error('Export All failed:', err);
+            Modals.showInfo('Error', 'Failed to export all documents');
+        }
     },
 
     showImport() {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.html';
+        input.accept = '.html,.md';
 
         input.onchange = async (e) => {
             const file = e.target.files[0];
@@ -114,80 +147,121 @@ const Main = {
             reader.onload = async (event) => {
                 try {
                     const text = event.target.result;
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(text, 'text/html');
-
                     const parentId = Tree.selectedId;
-                    const documentDivs = doc.querySelectorAll('.document');
-                    console.log(`[Import] Found ${documentDivs.length} document containers`);
 
-                    const idMap = {}; // originalId -> newId
-                    const itemsToUpdate = []; // [{ newId, originalParentId }]
+                    // 1. Detect Bulk Format (Regardless of extension)
+                    const isMDBulk = text.includes('notebook-bulk-export') || text.includes('notebook-metadata:');
+                    const isHTMLBulk = text.includes('class="document"') || text.includes("class='document'");
 
-                    if (documentDivs.length > 0) {
+                    if (isMDBulk) {
+                        console.log('[Import] Detected bulk MD format');
+                        const docs = text.split(/<!-- notebook-doc-separator -->/).filter(part => part.trim());
+                        const idMap = {};
+                        const itemsToUpdate = [];
+
+                        for (const docStr of docs) {
+                            const metadataMatch = docStr.match(/<!-- notebook-metadata: ({.*?}) -->/);
+                            if (!metadataMatch) continue;
+
+                            try {
+                                const metadata = JSON.parse(metadataMatch[1]);
+
+                                // Extract title: look for the LAST heading BEFORE the metadata in this block
+                                const headPart = docStr.substring(0, docStr.indexOf(metadataMatch[0]));
+                                const titleLines = headPart.split('\n').filter(line => line.trim().startsWith('#'));
+
+                                let title = metadata.title;
+                                if (titleLines.length > 0) {
+                                    const lastTitleLine = titleLines[titleLines.length - 1];
+                                    title = lastTitleLine.replace(/^#+\s*/, '').trim();
+                                }
+
+                                // Extract content: everything after THIS metadata block
+                                const contentStart = docStr.indexOf(metadataMatch[0]) + metadataMatch[0].length;
+                                let rawContent = docStr.substring(contentStart).trim();
+
+                                // Pre-process: convert whitespace-only lines to visible breaks
+                                // Lines with only spaces (like "  ") become <br> for visual spacing
+                                let processedContent = rawContent
+                                    .split('\n')
+                                    .map(line => line.trim() === '' ? '<br>' : line)
+                                    .join('\n');
+
+                                const htmlContent = marked.parse(processedContent);
+
+                                const newItem = await API.createDocument({
+                                    title: title,
+                                    content: htmlContent,
+                                    is_folder: 0,
+                                    parent_id: null
+                                });
+                                idMap[metadata.id] = newItem.id;
+                                if (metadata.parent_id) {
+                                    itemsToUpdate.push({ newId: newItem.id, originalParentId: metadata.parent_id });
+                                }
+                            } catch (e) {
+                                console.error('[Import] Failed to parse MD block', e);
+                            }
+                        }
+                        for (const task of itemsToUpdate) {
+                            const newParentId = idMap[task.originalParentId];
+                            if (newParentId) await API.updateDocument(task.newId, { parent_id: newParentId });
+                        }
+                        Modals.showInfo('Import Successful', `Successfully imported ${Object.keys(idMap).length} documents from MD archive.`);
+
+                    } else if (isHTMLBulk) {
+                        console.log('[Import] Detected bulk HTML format');
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(text, 'text/html');
+                        const documentDivs = doc.querySelectorAll('.document');
+                        const idMap = {};
+                        const itemsToUpdate = [];
+
                         for (const div of documentDivs) {
                             const originalId = div.dataset.id;
-                            const originalParentId = div.dataset.parentId; // undefined for root docs
-                            const titleEl = div.querySelector('h1');
-                            const title = titleEl ? titleEl.textContent.trim() : 'Untitled';
-
+                            const originalParentId = div.dataset.parentId;
+                            const title = div.querySelector('h1')?.textContent.trim() || 'Untitled';
                             let content = "";
-                            // Find content div - skip .tree-indicator and .children
                             const allDivs = div.querySelectorAll(':scope > div');
                             for (const d of allDivs) {
                                 if (!d.classList.contains('tree-indicator') && !d.classList.contains('children')) {
                                     content = d.innerHTML;
-                                    break;
                                 }
                             }
-
-                            // Root documents (no originalParentId) -> parent_id: null
-                            // Child documents -> will be re-parented in Pass 2
-                            const initialParentId = originalParentId ? null : null; // All start at root
-
-                            console.log(`[Import] Creating: ${title}, originalParent: ${originalParentId || 'ROOT'}`);
-                            const newItem = await API.createDocument({
-                                title: title,
-                                content: content,
-                                is_folder: 0,
-                                parent_id: initialParentId
-                            });
-
+                            const newItem = await API.createDocument({ title, content, parent_id: null });
                             idMap[originalId] = newItem.id;
-                            if (originalParentId) {
-                                itemsToUpdate.push({
-                                    newId: newItem.id,
-                                    originalParentId: originalParentId
-                                });
-                            }
+                            if (originalParentId) itemsToUpdate.push({ newId: newItem.id, originalParentId });
                         }
-
-                        // Pass 2: Re-parent documents that have internal parents
-                        console.log(`[Import] Re - parenting ${itemsToUpdate.length} documents...`);
                         for (const task of itemsToUpdate) {
                             const newParentId = idMap[task.originalParentId];
-                            if (newParentId) {
-                                await API.updateDocument(task.newId, {
-                                    parent_id: newParentId
-                                });
-                            }
+                            if (newParentId) await API.updateDocument(task.newId, { parent_id: newParentId });
                         }
-                    } else {
-                        // Single document mode (no .document metadata)
-                        // Prefer h1 for title, then <title> tag, then filename
-                        const h1El = doc.querySelector('h1');
-                        const titleEl = doc.querySelector('title');
-                        const title = h1El?.textContent?.trim() ||
-                            titleEl?.textContent?.trim() ||
-                            file.name.replace('.html', '');
+                        Modals.showInfo('Import Successful', `Successfully imported ${documentDivs.length} documents from HTML archive.`);
 
-                        // Clone body and remove h1 if we used it for title
-                        const bodyClone = doc.body.cloneNode(true);
-                        if (h1El) {
-                            const h1InClone = bodyClone.querySelector('h1');
-                            if (h1InClone) h1InClone.remove();
+                    } else {
+                        // 2. Single Document Import
+                        let title = file.name.replace(/\.(html|md)$/, '');
+                        let content = "";
+
+                        if (file.name.endsWith('.md')) {
+                            // Pre-process: convert whitespace-only lines to visible breaks
+                            let processedContent = text
+                                .split('\n')
+                                .map(line => line.trim() === '' ? '<br>' : line)
+                                .join('\n');
+                            content = marked.parse(processedContent);
+                            const titleMatch = text.match(/^# (.*)$/m);
+                            if (titleMatch) title = titleMatch[1].trim();
+                        } else {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(text, 'text/html');
+                            const h1 = doc.querySelector('h1');
+                            if (h1) {
+                                title = h1.textContent.trim();
+                                h1.remove();
+                            }
+                            content = doc.body ? doc.body.innerHTML : text;
                         }
-                        const content = bodyClone.innerHTML;
 
                         await API.createDocument({
                             title: title,
@@ -195,19 +269,17 @@ const Main = {
                             is_folder: 0,
                             parent_id: parentId
                         });
+                        Modals.showInfo('Import Successful', 'Successfully imported single document.');
                     }
 
                     await Tree.refresh();
-                    const count = documentDivs.length || 1;
-                    alert(`Successfully imported ${count} document(s).`);
                 } catch (err) {
                     console.error('Import failed:', err);
-                    alert('Failed to import documents');
+                    Modals.showInfo('Import Failed', 'Failed to import documents');
                 }
             };
             reader.readAsText(file);
         };
-
         input.click();
     },
 
@@ -292,10 +364,10 @@ const Main = {
                     const text = event.target.result;
                     await this.importCherryTree(text);
                     await Tree.refresh();
-                    alert('Import successful!');
+                    Modals.showInfo('Import Successful', 'Import successful!');
                 } catch (err) {
                     console.error('Import failed:', err);
-                    alert('Import failed: ' + err.message);
+                    Modals.showInfo('Import Failed', 'Import failed: ' + err.message);
                 }
             };
             reader.readAsText(file);
@@ -360,13 +432,19 @@ const Main = {
     },
 
     downloadFile(filename, text) {
+        const mimeType = filename.endsWith('.md') ? 'text/markdown' : 'text/html';
+        const blob = new Blob([text], { type: mimeType });
+        const url = URL.createObjectURL(blob);
         const element = document.createElement('a');
-        element.setAttribute('href', 'data:text/html;charset=utf-8,' + encodeURIComponent(text));
-        element.setAttribute('download', filename);
+        element.href = url;
+        element.download = filename;
         element.style.display = 'none';
         document.body.appendChild(element);
         element.click();
-        document.body.removeChild(element);
+        setTimeout(() => {
+            document.body.removeChild(element);
+            URL.revokeObjectURL(url);
+        }, 100);
     }
 };
 

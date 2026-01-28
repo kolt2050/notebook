@@ -160,13 +160,13 @@ async def delete_all_documents(db: AsyncSession = Depends(database.get_db)):
     await db.commit()
     return None
 
-@app.get("/api/export/all", response_class=HTMLResponse)
+@app.get("/api/export/all")
 async def export_all(db: AsyncSession = Depends(database.get_db)):
-    html = await export_service.export_all_to_html(db)
+    md = await export_service.export_all_to_markdown(db)
     return Response(
-        content=html,
-        media_type="text/html",
-        headers={"Content-Disposition": "attachment; filename=notebook_export.html"}
+        content=md,
+        media_type="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=notebook_export.md"}
     )
 
 # Serve static files
