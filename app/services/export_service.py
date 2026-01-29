@@ -33,16 +33,22 @@ async def export_all_to_markdown(db: AsyncSession) -> str:
         
         markdown_text = h.handle(content_with_placeholders)
         
-        # Restore protected images, isolating them on their own lines for correct Markdown parsing
+        # Restore protected images WITHOUT adding manual newlines (as per user request)
         for i, img_tag in enumerate(protected_imgs):
             placeholder = f"---IMG_PROTECT_{i}---"
-            markdown_text = markdown_text.replace(placeholder, f"\n\n{img_tag}\n\n")
+            markdown_text = markdown_text.replace(placeholder, img_tag)
+        
+        # Aggressively remove stray backslashes that html2text adds before tags or newlines
+        markdown_text = re.sub(r'\\(?=\s*<)', '', markdown_text)
+        markdown_text = re.sub(r'\\\s*\n', '\n', markdown_text)
         
         # Clean up empty bold/italic markers like **, __, * *, etc.
-        # These are often generated from <p><strong><br></strong></p> in contenteditable
-        markdown_text = re.sub(r'(\*\*|__|^\*|^_)\s+\1', '', markdown_text) # Handles ** **, __ __
-        markdown_text = re.sub(r'^\s*(\*\*|__|^\*|^_)\s*$', '', markdown_text, flags=re.MULTILINE) # Handles lone markers
-        markdown_text = re.sub(r'\n\s*(\*+|_)\s*\n', '\n\n', markdown_text) # Handles lines with only asterisks/underscores
+        markdown_text = re.sub(r'(\*\*|__|^\*|^_)\s+\1', '', markdown_text)
+        markdown_text = re.sub(r'^\s*(\*\*|__|^\*|^_)\s*$', '', markdown_text, flags=re.MULTILINE)
+        markdown_text = re.sub(r'\n\s*(\*+|_)\s*\n', '\n\n', markdown_text)
+        
+        # FINAL NORMALIZATION: collapse any sequence of 4+ newlines to exactly 3 (2 blank lines)
+        markdown_text = re.sub(r'(\r?\n\s*){4,}', '\n\n\n', markdown_text).strip()
         
         md_content += f"# {doc.title}\n"
         

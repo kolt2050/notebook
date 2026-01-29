@@ -18,8 +18,15 @@ const API = {
             body: JSON.stringify(data)
         });
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || 'Failed to create document');
+            let errorMsg = 'Failed to create document';
+            try {
+                const err = await res.json();
+                errorMsg = err.detail || errorMsg;
+            } catch (e) {
+                const text = await res.text();
+                errorMsg = text || errorMsg;
+            }
+            throw new Error(errorMsg);
         }
         return res.json();
     },
@@ -31,8 +38,15 @@ const API = {
             body: JSON.stringify(data)
         });
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || 'Failed to update document');
+            let errorMsg = 'Failed to update document';
+            try {
+                const err = await res.json();
+                errorMsg = err.detail || errorMsg;
+            } catch (e) {
+                const text = await res.text();
+                errorMsg = text || errorMsg;
+            }
+            throw new Error(errorMsg);
         }
         return res.json();
     },

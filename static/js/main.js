@@ -198,8 +198,11 @@ const Main = {
                                 const contentStart = docStr.indexOf(metadataMatch[0]) + metadataMatch[0].length;
                                 let rawContent = docStr.substring(contentStart).trim();
 
-                                // Preserve empty lines: replace sequences of 2+ newlines with paragraph breaks
-                                let processedContent = rawContent.replace(/\n\n+/g, '\n\n<br>\n\n');
+                                // Preserve empty lines: N newlines => N-1 visual <br> tags (since margins are 0)
+                                let processedContent = rawContent.replace(/\n\n+/g, (match) => {
+                                    const n = match.split('\n').length - 1;
+                                    return '\n\n' + '<br>\n\n'.repeat(n - 1);
+                                });
 
                                 if (typeof marked === 'undefined') {
                                     throw new Error('Markdown parser (marked) not loaded.');
@@ -268,8 +271,11 @@ const Main = {
                         let content = "";
 
                         if (file.name.endsWith('.md')) {
-                            // Preserve empty lines: replace sequences of 2+ newlines with paragraph breaks
-                            let processedContent = text.replace(/\n\n+/g, '\n\n<br>\n\n');
+                            // Preserve empty lines: N newlines => N-1 visual <br> tags (since margins are 0)
+                            let processedContent = text.replace(/\n\n+/g, (match) => {
+                                const n = match.split('\n').length - 1;
+                                return '\n\n' + '<br>\n\n'.repeat(n - 1);
+                            });
                             if (typeof marked === 'undefined') {
                                 throw new Error('Markdown parser (marked) not loaded.');
                             }

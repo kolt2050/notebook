@@ -13,6 +13,9 @@ const Editor = {
 
         // Initialize resizer
         ImageResizer.init(this);
+
+        // Ensure consistent line behavior (divs for new lines)
+        document.execCommand('defaultParagraphSeparator', false, 'div');
     },
 
     format(cmd, val) {

@@ -385,7 +385,7 @@ body {
 
 .editor-content p,
 .editor-content div {
-    margin-bottom: 0.8em !important;
+    margin-bottom: 0 !important;
 }
 
 .editor-content p:last-child,
