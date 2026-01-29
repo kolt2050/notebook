@@ -394,6 +394,7 @@ body {
 }
 
 .editor-content img {
+    display: block;
     max-width: 100%;
     border-radius: 8px;
     margin: 0.5em 0;

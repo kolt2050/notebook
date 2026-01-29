@@ -1,3 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project Specific
+data/*.db
 .agent/
-__pycache__
-notebook.db
