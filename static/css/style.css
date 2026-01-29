@@ -518,6 +518,28 @@ a:hover {
     color: white;
 }
 
+.btn.backup {
+    background: rgba(88, 166, 255, 0.1);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    color: #58a6ff;
+}
+
+.btn.backup:hover {
+    background: rgba(88, 166, 255, 0.2);
+    border-color: #58a6ff;
+}
+
+.btn.import {
+    background: rgba(35, 134, 54, 0.1);
+    border: 1px solid rgba(35, 134, 54, 0.3);
+    color: #3fb950;
+}
+
+.btn.import:hover {
+    background: rgba(35, 134, 54, 0.2);
+    border-color: #3fb950;
+}
+
 .hidden {
     display: none;
 }
