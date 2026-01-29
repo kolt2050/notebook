@@ -343,7 +343,7 @@ body {
     padding: 60px;
     outline: none;
     overflow-y: auto;
-    font-size: 1.1rem;
+    font-size: 11pt;
     line-height: 1.5;
     max-width: 850px;
     margin: 20px auto;
@@ -396,7 +396,7 @@ body {
 .editor-content img {
     max-width: 100%;
     border-radius: 8px;
-    margin: 10px 0;
+    margin: 0.5em 0;
 }
 
 /* Modals */
