@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Annotated
@@ -93,6 +93,39 @@ async def backup_db():
         media_type="application/x-sqlite3",
         filename="notebook.backup.db"
     )
+
+@app.post("/api/import/db")
+async def import_db():
+    # Use Request to get form data manually to avoid Pydantic issues with File/UploadFile if any, 
+    # but standard UploadFile is fine.
+    # We'll use a slightly more robust approach to replace the file on Windows.
+    pass
+
+@app.post("/api/import/db/upload")
+async def import_db_upload(file: UploadFile = File(...)):
+    if not file.filename.endswith('.db'):
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a .db file.")
+    
+    db_path = os.path.join("data", "notebook.db")
+    
+    # 1. Close current connections
+    await database.engine.dispose()
+    
+    try:
+        # 2. Save new file
+        with open(db_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # 3. Re-initialize database (sessionmaker etc. are already linked to the engine)
+        # Re-creating the engine is actually handled by SQLAlchemy internally when next used if disposed,
+        # but we might want to ensure it's fresh.
+        # Actually, database.engine is a global. If we dispose it, we should probably recreate it
+        # or just let it be. Disposal closes all connections in the pool.
+        
+        return {"status": "success", "message": "Database imported successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 # Serve static files
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

@@ -136,6 +136,7 @@ const Main = {
         document.getElementById('export-doc-btn').onclick = () => this.exportCurrent();
         document.getElementById('export-all-btn').onclick = () => this.exportAll();
         document.getElementById('backup-db-btn').onclick = () => this.backupDb();
+        document.getElementById('import-db-btn').onclick = () => this.importDb();
 
         const resetBtn = document.getElementById('reset-btn');
         if (resetBtn) {
@@ -309,6 +310,60 @@ const Main = {
         } else {
             window.open('/api/backup/db', '_blank');
         }
+    },
+
+    async importDb() {
+        Modals.showConfirm(
+            I18n.get('confirm_import_title'),
+            I18n.get('confirm_import_text'),
+            async () => {
+                try {
+                    let file;
+                    if ('showOpenFilePicker' in window) {
+                        const [handle] = await window.showOpenFilePicker({
+                            types: [{
+                                description: 'SQLite Database',
+                                accept: { 'application/x-sqlite3': ['.db'] }
+                            }],
+                            multiple: false
+                        });
+                        file = await handle.getFile();
+                    } else {
+                        // Fallback for browsers without showOpenFilePicker
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.db';
+                        file = await new Promise((resolve) => {
+                            input.onchange = () => resolve(input.files[0]);
+                            input.click();
+                        });
+                    }
+
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('/api/import/db/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const err = await response.json();
+                        alert(err.detail || 'Import failed');
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Import failed:', err);
+                        alert('Import failed: ' + err.message);
+                    }
+                }
+            },
+            'danger'
+        );
     }
 };
 
