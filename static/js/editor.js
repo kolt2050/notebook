@@ -4,8 +4,6 @@ const Editor = {
     currentDoc: null,
 
     init() {
-        document.getElementById('bold-btn').onclick = () => this.format('bold');
-        document.getElementById('remove-format-btn').onclick = () => this.format('removeFormat');
         document.getElementById('delete-btn').onclick = () => this.delete();
 
         // Support pasting images
@@ -90,7 +88,7 @@ const Editor = {
         const trimmedText = text.trim();
 
         if (urlRegex.test(trimmedText)) {
-            const html = `<a href="${trimmedText}" target="_blank" title="Ctrl + Click to follow link">${trimmedText}</a>`;
+            const html = `<a href="${trimmedText}" target="_blank" title="${I18n.get('ctrl_click_hint')}">${trimmedText}</a>`;
             this.format('insertHTML', html);
         } else {
             this.format('insertText', text);
@@ -118,7 +116,7 @@ const Editor = {
         this.currentDoc = doc;
         this.titleInput.value = doc.title;
         this.contentArea.innerHTML = doc.content || '';
-        this.contentArea.setAttribute('placeholder', 'Type something...');
+        this.contentArea.setAttribute('placeholder', I18n.get('doc_title_placeholder'));
 
         // Highlight search pattern if active
         const searchInput = document.getElementById('search-input');
@@ -132,7 +130,7 @@ const Editor = {
         this.currentDoc = null;
         this.titleInput.value = '';
         this.contentArea.innerHTML = '';
-        this.contentArea.setAttribute('placeholder', 'Select a document to edit');
+        this.contentArea.setAttribute('placeholder', I18n.get('doc_title_placeholder'));
     },
 
     async save() {
@@ -221,11 +219,16 @@ const Editor = {
 
     async delete() {
         if (!this.currentDoc) return;
-        Modals.show('Delete Document', `<p>Delete "${this.currentDoc.title}"?</p>`, async () => {
-            await API.deleteDocument(this.currentDoc.id);
-            this.clear();
-            Tree.refresh();
-        }, 'danger');
+        Modals.show(
+            I18n.get('confirm_delete_title'),
+            I18n.get('confirm_delete_text', { title: this.currentDoc.title }),
+            async () => {
+                await API.deleteDocument(this.currentDoc.id);
+                this.clear();
+                Tree.refresh();
+            },
+            'danger'
+        );
     }
 };
 

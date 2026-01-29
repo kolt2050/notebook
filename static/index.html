@@ -10,19 +10,23 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600&display=swap"
         rel="stylesheet">
+    <script src="js/i18n.js"></script>
 </head>
 
 <body>
     <div class="app-container">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>Notebook</h2>
+                <h2 data-i18n="app_title">Notebook</h2>
                 <div class="sidebar-actions">
-                    <button id="add-doc-btn" title="Add Document">📄+</button>
+                    <button id="lang-toggle-btn" class="btn"
+                        style="padding: 2px 6px; font-size: 0.8em; margin-right: 5px;">EN</button>
+                    <button id="add-doc-btn" data-i18n="add_doc" data-i18n-attr="title"
+                        title="Add Document">📄+</button>
                 </div>
             </div>
             <div class="search-box">
-                <input type="text" id="search-input" placeholder="Поиск...">
+                <input type="text" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Поиск...">
                 <span id="search-clear" class="search-clear">&times;</span>
             </div>
             <div id="tree-container" class="tree-container">
@@ -30,26 +34,24 @@
             </div>
             <div class="sidebar-footer">
                 <div class="sidebar-footer-actions" style="margin-bottom: 15px;">
-                    <button id="export-all-btn" class="btn secondary"
+                    <button id="export-all-btn" class="btn secondary" data-i18n="export_all"
                         style="width: 100%; font-size: 0.85em; padding: 6px;">Export All</button>
                 </div>
                 <div class="stats" style="margin-bottom: 10px; font-size: 0.9em; opacity: 0.7;">
-                    Total documents: <span id="doc-count">0</span>
+                    <span data-i18n="total_docs">Total documents: </span><span id="doc-count">0</span>
                 </div>
-                <button id="reset-btn" class="btn danger" style="width: 100%;">Reset Notebook</button>
+                <button id="reset-btn" class="btn danger" data-i18n="reset_notebook" style="width: 100%;">Reset
+                    Notebook</button>
             </div>
         </aside>
         <div id="resizer" class="resizer"></div>
         <main class="main-content">
             <header class="editor-header">
-                <input type="text" id="doc-title" placeholder="Document Title..." class="title-input">
+                <input type="text" id="doc-title" data-i18n-placeholder="doc_title_placeholder"
+                    placeholder="Document Title..." class="title-input">
                 <div class="editor-toolbar">
-                    <button id="bold-btn" class="toolbar-btn">B</button>
-                    <button id="remove-format-btn" class="toolbar-btn" title="Clear all formatting">Clear
-                        format</button>
-                    <div class="toolbar-separator"></div>
-                    <button id="export-doc-btn" class="toolbar-btn">Export to Markdown</button>
-                    <button id="delete-btn" class="toolbar-btn danger">Delete</button>
+                    <button id="export-doc-btn" class="toolbar-btn" data-i18n="export_md">Export to Markdown</button>
+                    <button id="delete-btn" class="toolbar-btn danger" data-i18n="delete_btn">Delete</button>
                 </div>
             </header>
             <div id="editor" class="editor-content" contenteditable="true">
@@ -64,8 +66,8 @@
             <h3 id="modal-title">Modal Title</h3>
             <div id="modal-body" class="modal-body"></div>
             <div class="modal-footer">
-                <button id="modal-cancel" class="btn">Cancel</button>
-                <button id="modal-confirm" class="btn primary">Confirm</button>
+                <button id="modal-cancel" class="btn" data-i18n="modal_cancel">Cancel</button>
+                <button id="modal-confirm" class="btn primary" data-i18n="modal_confirm">Confirm</button>
             </div>
         </div>
     </div>

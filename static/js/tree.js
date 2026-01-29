@@ -33,8 +33,22 @@ const Tree = {
             console.error('Tree data is not an array:', data);
             return;
         }
-        const list = this.createList(data);
+
+        // Sort documents alphabetically before rendering
+        const sortedData = this.sortTreeData(data);
+        const list = this.createList(sortedData);
         this.container.appendChild(list);
+    },
+
+    sortTreeData(data) {
+        return [...data].sort((a, b) => {
+            return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
+        }).map(item => {
+            if (item.children && item.children.length > 0) {
+                return { ...item, children: this.sortTreeData(item.children) };
+            }
+            return item;
+        });
     },
 
     createList(data, isRoot = true) {
@@ -74,7 +88,7 @@ const Tree = {
         const addBtn = document.createElement('button');
         addBtn.className = 'tree-action-btn';
         addBtn.textContent = '➕';
-        addBtn.title = 'Add Sub-document';
+        addBtn.title = I18n.get('add_sub_doc');
         addBtn.onclick = (e) => {
             e.stopPropagation();
             Main.addNew(item.id);
@@ -84,7 +98,7 @@ const Tree = {
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'tree-action-btn';
         deleteBtn.textContent = '🗑️';
-        deleteBtn.title = 'Delete';
+        deleteBtn.title = I18n.get('delete_tooltip');
         deleteBtn.onclick = (e) => {
             e.stopPropagation();
             this.deleteItem(item);
@@ -201,13 +215,18 @@ const Tree = {
     },
 
     async deleteItem(item) {
-        Modals.show('Delete Document', `<p>Delete "${item.title}" and all its sub-documents?</p>`, async () => {
-            await API.deleteDocument(item.id);
-            if (Editor.currentDoc && Editor.currentDoc.id === item.id) {
-                Editor.clear();
-            }
-            await this.refresh();
-        }, 'danger');
+        Modals.show(
+            I18n.get('confirm_delete_title'),
+            I18n.get('confirm_delete_text', { title: item.title }),
+            async () => {
+                await API.deleteDocument(item.id);
+                if (Editor.currentDoc && Editor.currentDoc.id === item.id) {
+                    Editor.clear();
+                }
+                await this.refresh();
+            },
+            'danger'
+        );
     },
 
     async renameItem(item) {
@@ -281,7 +300,7 @@ const Tree = {
         };
 
         if (this.isDescendantOf(treeData, draggedId, targetId)) {
-            Modals.showInfo('Error', 'Cannot move a document into its own sub-document.');
+            Modals.showInfo(I18n.get('move_error_title'), I18n.get('move_circular_error'));
             return;
         }
 
@@ -309,7 +328,7 @@ const Tree = {
             await this.refresh();
         } catch (err) {
             console.error('Move failed:', err);
-            Modals.showInfo('Error', 'Failed to move document');
+            Modals.showInfo(I18n.get('move_error_title'), I18n.get('move_failed'));
         }
     },
 

@@ -46,6 +46,9 @@ const Main = {
             console.error('Failed to load tree:', err);
         }
 
+        // Initialize localization
+        I18n.init();
+
         // Add event listeners
         this.addEventListeners();
         this.initResizer();
@@ -100,6 +103,7 @@ const Main = {
     },
 
     addEventListeners() {
+        document.getElementById('lang-toggle-btn').onclick = () => I18n.toggle();
         document.getElementById('add-doc-btn').onclick = () => this.addNew();
 
         // Search with debounce
@@ -136,8 +140,8 @@ const Main = {
         if (resetBtn) {
             resetBtn.onclick = () => {
                 Modals.show(
-                    'Reset Notebook',
-                    '<p>Are you sure you want to delete ALL documents? This action cannot be undone.</p>',
+                    I18n.get('confirm_reset_title'),
+                    I18n.get('confirm_reset_text'),
                     async () => {
                         await API.deleteAllDocuments();
                         Editor.clear();
@@ -152,7 +156,7 @@ const Main = {
     async addNew(parentId = null) {
         try {
             const newItem = await API.createDocument({
-                title: "New Document",
+                title: I18n.get('new_doc_title'),
                 is_folder: 0,
                 parent_id: parentId
             });
@@ -169,11 +173,11 @@ const Main = {
 
     async exportCurrent() {
         if (!Editor.currentDoc) {
-            Modals.showInfo('Notice', 'Please select a document first.');
+            Modals.showInfo(I18n.get('notice_title'), I18n.get('select_first'));
             return;
         }
         if (!this.turndown) {
-            Modals.showInfo('Error', 'Markdown converter not loaded. Please check your connection.');
+            Modals.showInfo(I18n.get('error_title'), I18n.get('converter_error'));
             return;
         }
         const md = this.turndown.turndown(Editor.contentArea.innerHTML);
@@ -189,7 +193,7 @@ const Main = {
             this.downloadFile('notebook_export.md', md);
         } catch (err) {
             console.error('Export All failed:', err);
-            Modals.showInfo('Error', 'Failed to export all documents');
+            Modals.showInfo(I18n.get('error_title'), I18n.get('export_all_error'));
         }
     },
 
