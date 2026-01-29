@@ -129,11 +129,40 @@ body {
 /* Sidebar */
 .sidebar {
     width: 300px;
+    min-width: 200px;
+    max-width: 600px;
     background-color: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
+    position: relative;
 }
+
+.resizer {
+    width: 4px;
+    background-color: transparent;
+    cursor: col-resize;
+    transition: background-color 0.2s, width 0.2s;
+    z-index: 10;
+    position: relative;
+    margin-left: -2px;
+    margin-right: -2px;
+}
+
+.resizer:hover, .resizer.active {
+    background-color: var(--accent-color);
+    width: 4px;
+}
+
+.resizing-active {
+    cursor: col-resize;
+    user-select: none;
+}
+
+.resizing-active * {
+    pointer-events: none !important;
+}
+
 
 .sidebar-header {
     padding: 20px;

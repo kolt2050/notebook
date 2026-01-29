@@ -48,6 +48,7 @@ const Main = {
 
         // Add event listeners
         this.addEventListeners();
+        this.initResizer();
         this.refreshStats();
 
         // Auto-save every 5 minutes
@@ -55,6 +56,47 @@ const Main = {
             console.log('[Auto-save] Periodic trigger');
             Editor.save();
         }, 5 * 60 * 1000);
+    },
+
+    initResizer() {
+        const sidebar = document.querySelector('.sidebar');
+        const resizer = document.getElementById('resizer');
+        const appContainer = document.querySelector('.app-container');
+
+        // Load saved width
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth) {
+            sidebar.style.width = savedWidth + 'px';
+        }
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.classList.add('resizing-active');
+            resizer.classList.add('active');
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+
+            let newWidth = e.clientX;
+
+            // Constrain width
+            if (newWidth < 200) newWidth = 200;
+            if (newWidth > 600) newWidth = 600;
+
+            sidebar.style.width = newWidth + 'px';
+            localStorage.setItem('sidebarWidth', newWidth);
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.classList.remove('resizing-active');
+                resizer.classList.remove('active');
+            }
+        });
     },
 
     addEventListeners() {
