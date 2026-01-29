@@ -16,6 +16,26 @@ const Editor = {
 
         // Ensure consistent line behavior (divs for new lines)
         document.execCommand('defaultParagraphSeparator', false, 'div');
+
+        // Ctrl+Click navigation for links
+        this.contentArea.onclick = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.target.tagName === 'A') {
+                e.preventDefault();
+                window.open(e.target.href, '_blank');
+            }
+        };
+
+        // Visual feedback for Ctrl key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Control' || e.key === 'Meta') {
+                this.contentArea.classList.add('ctrl-down');
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'Control' || e.key === 'Meta') {
+                this.contentArea.classList.remove('ctrl-down');
+            }
+        });
     },
 
     format(cmd, val) {
@@ -61,10 +81,20 @@ const Editor = {
             }
         }
 
-        // Handle text paste (force plain text)
+        // Handle text paste
         e.preventDefault();
         const text = clipboardData.getData('text/plain');
-        this.format('insertText', text);
+
+        // Check if the pasted text is a URL
+        const urlRegex = /^(https?:\/\/[^\s]+)$/i;
+        const trimmedText = text.trim();
+
+        if (urlRegex.test(trimmedText)) {
+            const html = `<a href="${trimmedText}" target="_blank" title="Ctrl + Click to follow link">${trimmedText}</a>`;
+            this.format('insertHTML', html);
+        } else {
+            this.format('insertText', text);
+        }
     },
 
     insertImage() {

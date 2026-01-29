@@ -121,6 +121,21 @@ body {
     overflow: hidden;
 }
 
+a {
+    color: var(--accent-color);
+    text-decoration: underline;
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: #7abaff;
+    text-decoration: none;
+}
+
+.editor-content.ctrl-down a:hover {
+    cursor: pointer;
+}
+
 .app-container {
     display: flex;
     height: 100vh;
@@ -149,7 +164,8 @@ body {
     margin-right: -2px;
 }
 
-.resizer:hover, .resizer.active {
+.resizer:hover,
+.resizer.active {
     background-color: var(--accent-color);
     width: 4px;
 }
