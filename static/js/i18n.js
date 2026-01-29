@@ -4,6 +4,7 @@ const I18n = {
         EN: {
             app_title: "Notebook",
             add_doc: "Add Document",
+            backup_db: "Backup DB",
             search_placeholder: "Search...",
             export_all: "Export All",
             total_docs: "Total documents: ",
@@ -35,6 +36,7 @@ const I18n = {
         RU: {
             app_title: "Блокнот",
             add_doc: "Добавить документ",
+            backup_db: "Бэкап БД",
             search_placeholder: "Поиск...",
             export_all: "Экспортировать всё",
             total_docs: "Всего документов: ",

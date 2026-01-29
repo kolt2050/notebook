@@ -5,7 +5,8 @@ from typing import List, Annotated
 from . import models, schemas, database, exceptions
 from .services import export_service
 from .services.document_service import DocumentService
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse, FileResponse
+import os
 
 app = FastAPI(title="Portable Notebook")
 
@@ -80,6 +81,17 @@ async def export_all(db: DB_Session):
         content=md,
         media_type="text/markdown",
         headers={"Content-Disposition": "attachment; filename=notebook_export.md"}
+    )
+
+@app.get("/api/backup/db")
+async def backup_db():
+    db_path = os.path.join("data", "notebook.db")
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Database file not found")
+    return FileResponse(
+        db_path,
+        media_type="application/x-sqlite3",
+        filename="notebook.backup.db"
     )
 
 # Serve static files

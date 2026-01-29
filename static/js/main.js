@@ -135,6 +135,7 @@ const Main = {
         // Export/Import stubs for now
         document.getElementById('export-doc-btn').onclick = () => this.exportCurrent();
         document.getElementById('export-all-btn').onclick = () => this.exportAll();
+        document.getElementById('backup-db-btn').onclick = () => this.backupDb();
 
         const resetBtn = document.getElementById('reset-btn');
         if (resetBtn) {
@@ -280,6 +281,34 @@ const Main = {
             document.body.removeChild(element);
             URL.revokeObjectURL(url);
         }, 100);
+    },
+
+    async backupDb() {
+        if ('showSaveFilePicker' in window) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: 'notebook.backup.db',
+                    types: [{
+                        description: 'SQLite Database',
+                        accept: { 'application/x-sqlite3': ['.db'] }
+                    }]
+                });
+
+                const response = await fetch('/api/backup/db');
+                const blob = await response.blob();
+
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Backup failed:', err);
+                    window.open('/api/backup/db', '_blank');
+                }
+            }
+        } else {
+            window.open('/api/backup/db', '_blank');
+        }
     }
 };
 
