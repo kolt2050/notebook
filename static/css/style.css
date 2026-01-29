@@ -385,13 +385,12 @@ a:hover {
 /* Editor */
 .editor-content {
     flex: 1;
-    padding: 60px;
+    padding: 40px;
     outline: none;
     overflow-y: auto;
     font-size: 11pt;
     line-height: 1.5;
-    max-width: 850px;
-    margin: 20px auto;
+    margin: 20px;
     width: calc(100% - 40px);
     position: relative;
     background: #1c2128;
