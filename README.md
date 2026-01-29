@@ -1,4 +1,4 @@
-# Приложение Notebook
+# <img src="static/img/logo-dark.png" width="32" vertical-align="middle"> Приложение Notebook
 
 Быстрый, легкий и портативный блокнот с поддержкой Markdown, вложенности документов и организации через Drag & Drop.
 
