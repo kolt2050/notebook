@@ -143,8 +143,8 @@ a:hover {
 
 /* Sidebar */
 .sidebar {
-    width: 300px;
-    min-width: 200px;
+    width: 320px;
+    min-width: 320px;
     max-width: 600px;
     background-color: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
@@ -180,18 +180,6 @@ a:hover {
 }
 
 
-.sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.sidebar-header h2 {
-    font-family: var(--font-heading);
-    font-size: 1.2rem;
-}
 
 .sidebar-actions button {
     background: transparent;
@@ -397,6 +385,38 @@ a:hover {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+}
+
+.app-logo-wrapper {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+}
+
+.app-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.sidebar-header h2 {
+    margin: 0;
+    font-size: 1.4em;
+    font-family: var(--font-heading);
 }
 
 .editor-content * {
