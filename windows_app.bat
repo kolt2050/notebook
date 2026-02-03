@@ -10,8 +10,8 @@ if %errorlevel% neq 0 (
 
 echo.
 echo Build finished. Starting application...
-echo Opening browser in 5 seconds...
-start /b cmd /c "timeout /t 5 >nul & start http://localhost:8005"
+echo Opening browser in 3 seconds...
+start /b cmd /c "timeout /t 3 >nul & start http://localhost:8005"
 docker-compose up -d
 
 exit
