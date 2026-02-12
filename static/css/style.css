@@ -603,3 +603,32 @@ a:hover {
 .img-resize-handle.se {
     cursor: nwse-resize;
 }
+
+/* Code Highlighting */
+code {
+    background-color: rgba(110, 118, 129, 0.4);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+    font-size: 85%;
+}
+
+pre {
+    background-color: #161b22;
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 16px !important;
+}
+
+pre code {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 100%;
+    white-space: pre;
+    word-break: normal;
+}

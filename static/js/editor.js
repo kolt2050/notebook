@@ -9,6 +9,9 @@ const Editor = {
         // Support pasting images
         this.contentArea.onpaste = (e) => this.handlePaste(e);
 
+        // Handle text input for auto-formatting
+        this.contentArea.addEventListener('input', (e) => this.handleInput(e));
+
         // Initialize resizer
         ImageResizer.init(this);
 
@@ -34,6 +37,220 @@ const Editor = {
                 this.contentArea.classList.remove('ctrl-down');
             }
         });
+
+        // Handle keydown for special behaviors (Enter in code block)
+        this.contentArea.addEventListener('keydown', (e) => this.handleKeyDown(e));
+    },
+
+    handleKeyDown(e) {
+        if (e.key === 'Enter') {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            let node = range.startContainer;
+
+            // Find if we are inside a code block
+            let inCodeBlock = false;
+            let currentBlock = node;
+            while (currentBlock && currentBlock !== this.contentArea) {
+                if (currentBlock.tagName === 'PRE') {
+                    inCodeBlock = true;
+                    break;
+                }
+                currentBlock = currentBlock.parentNode;
+            }
+
+            if (inCodeBlock) {
+                if (e.shiftKey) {
+                    // Shift+Enter: Break out of code block
+                    e.preventDefault();
+
+                    // Apply syntax highlighting to the block we're leaving
+                    const codeEl = currentBlock.querySelector('code');
+                    if (codeEl && window.hljs) {
+                        // Get plain text, strip any previous hljs markup
+                        const plainText = codeEl.textContent;
+                        codeEl.textContent = plainText;
+                        // Re-add language class if it was set
+                        const langClass = Array.from(codeEl.classList).find(c => c.startsWith('language-'));
+                        codeEl.removeAttribute('data-highlighted');
+                        if (langClass) {
+                            codeEl.className = langClass;
+                        }
+                        hljs.highlightElement(codeEl);
+                    }
+
+                    const newBlock = document.createElement('div');
+                    newBlock.innerHTML = '<br>'; // Empty line
+
+                    // Insert after the pre block
+                    if (currentBlock.nextSibling) {
+                        currentBlock.parentNode.insertBefore(newBlock, currentBlock.nextSibling);
+                    } else {
+                        currentBlock.parentNode.appendChild(newBlock);
+                    }
+
+                    // Move cursor to new block
+                    const newRange = document.createRange();
+                    newRange.setStart(newBlock, 0);
+                    newRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+                } else {
+                    // Enter: Insert newline inside code block
+                    e.preventDefault();
+
+                    // Insert newline character
+                    const textNode = document.createTextNode('\n');
+                    range.insertNode(textNode);
+
+                    // Move cursor after newline
+                    range.setStartAfter(textNode);
+                    range.setEndAfter(textNode);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    // Note: If this is the last character, some browsers might need an extra newline or space to show the cursor?
+                    // In <pre>, a trailing \n might not show a new line visually until text is typed.
+                    // But usually it works.
+                }
+            }
+        }
+    },
+
+    handleInput(e) {
+        if (e.inputType === 'insertText' || e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+
+            const range = selection.getRangeAt(0);
+            const node = range.startContainer;
+
+            // 1. Handle Code Block (Enter key)
+            if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+                // Find current block element (the one containing the cursor)
+                let currentBlock = node;
+
+                // If cursor is in a text node, get its parent (likely the div/p)
+                if (currentBlock.nodeType === Node.TEXT_NODE) {
+                    currentBlock = currentBlock.parentNode;
+                }
+
+                // If node is the editor itself (rare, happens if empty or cursor between blocks), find the child index
+                if (currentBlock === this.contentArea) {
+                    // range.startOffset is the index of the child we are at (or after)
+                    const idx = range.startOffset;
+                    if (idx > 0) {
+                        currentBlock = this.contentArea.childNodes[idx - 1];
+                    }
+                }
+
+                // Robust Previous Block Finding:
+                let prevBlock = currentBlock.previousElementSibling;
+
+                // Check if previous block matches ```lang
+                const textContent = prevBlock ? prevBlock.textContent.trim().replace(/\u200B/g, '') : '';
+                const match = textContent.match(/^```(\w+)?$/);
+
+                if (prevBlock && match) {
+                    const lang = match[1];
+
+                    // Transform prevBlock into PRE
+                    const pre = document.createElement('pre');
+                    const code = document.createElement('code');
+                    code.textContent = '\n';
+                    pre.className = 'code-block';
+
+                    if (lang) {
+                        code.className = `language-${lang}`;
+                    }
+
+                    pre.appendChild(code);
+
+                    if (prevBlock.parentNode) {
+                        prevBlock.parentNode.replaceChild(pre, prevBlock);
+
+                        // If the current block (new line) is empty, remove it to merge cursor into pre?
+                        // Better to keep cursor inside PRE and remove the extra div.
+                        if (currentBlock.textContent.trim() === '') {
+                            currentBlock.remove();
+                        }
+
+                        // Focus inside pre
+                        const newRange = document.createRange();
+                        newRange.setStart(code, 0);
+                        newRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+
+                        // Don't highlight now - block is empty.
+                        // Highlighting will happen when user exits (Shift+Enter) or on save/load.
+
+                        return;
+                    }
+                }
+            }
+
+            // 2. Handle Inline Code (Text input)
+            // Only process if we are in a text node (standard typing)
+            if (node.nodeType === Node.TEXT_NODE && e.inputType === 'insertText') {
+                const text = node.textContent;
+                const offset = range.startOffset;
+                const textBefore = text.slice(0, offset);
+
+                // Inline Code Pattern: `text` 
+                const inlineMatch = textBefore.match(/`([^`\n]+)`$/);
+                if (inlineMatch) {
+                    // Prevention: don't format if already inside code/pre
+                    let parent = node.parentNode;
+                    let isInsideCode = false;
+                    while (parent && parent !== this.contentArea) {
+                        if (parent.tagName === 'CODE' || parent.tagName === 'PRE') {
+                            isInsideCode = true;
+                            break;
+                        }
+                        parent = parent.parentNode;
+                    }
+                    if (isInsideCode) return;
+
+                    const matchText = inlineMatch[0]; // `code`
+                    const codeContent = inlineMatch[1]; // code
+
+                    const startIdx = offset - matchText.length;
+
+                    const before = text.slice(0, startIdx);
+                    const after = text.slice(offset);
+
+                    const code = document.createElement('code');
+                    code.className = 'inline-code';
+                    code.textContent = codeContent;
+
+                    const parentNode = node.parentNode;
+
+                    if (before) {
+                        parentNode.insertBefore(document.createTextNode(before), node);
+                    }
+
+                    parentNode.insertBefore(code, node);
+
+                    let nextNode;
+                    if (after) {
+                        nextNode = document.createTextNode(after);
+                    } else {
+                        nextNode = document.createTextNode('\u00A0'); // nbsp
+                    }
+                    parentNode.insertBefore(nextNode, node);
+
+                    parentNode.removeChild(node);
+
+                    const newRange = document.createRange();
+                    newRange.setStart(nextNode, 1);
+                    newRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+                }
+            }
+        }
     },
 
     format(cmd, val) {
@@ -83,6 +300,36 @@ const Editor = {
         e.preventDefault();
         const text = clipboardData.getData('text/plain');
 
+        // Check if inside code block
+        const selection = window.getSelection();
+        if (selection.rangeCount) {
+            const range = selection.getRangeAt(0);
+            let node = range.startContainer;
+            let inCodeBlock = false;
+            while (node && node !== this.contentArea) {
+                if (node.tagName === 'PRE') {
+                    inCodeBlock = true;
+                    break;
+                }
+                node = node.parentNode;
+            }
+
+            if (inCodeBlock) {
+                // Manual text insertion for code blocks to preserve newlines and avoid divs
+                const textNode = document.createTextNode(text);
+                range.deleteContents();
+                range.insertNode(textNode);
+
+                // Move cursor after pasted text
+                range.setStartAfter(textNode);
+                range.setEndAfter(textNode);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+        }
+
+        // Normal paste behavior
         // Check if the pasted text is a URL
         const urlRegex = /^(https?:\/\/[^\s]+)$/i;
         const trimmedText = text.trim();
@@ -122,6 +369,13 @@ const Editor = {
         const searchInput = document.getElementById('search-input');
         if (searchInput && searchInput.value) {
             this.applyHighlight(searchInput.value);
+        }
+
+        // Apply syntax highlighting to existing blocks
+        if (window.hljs) {
+            this.contentArea.querySelectorAll('pre code').forEach(block => {
+                hljs.highlightElement(block);
+            });
         }
     },
 
