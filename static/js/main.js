@@ -4,7 +4,34 @@ const Main = {
             if (typeof TurndownService !== 'undefined') {
                 this.turndown = new TurndownService({
                     headingStyle: 'atx',
-                    codeBlockStyle: 'fenced'
+                    codeBlockStyle: 'fenced',
+                    blankReplacement: function (content, node) {
+                        // For blank nodes (empty divs, br-only divs), return single newline
+                        return '\n';
+                    }
+                });
+
+                // Custom rule: properly handle all <pre> blocks (with or without <code>)
+                this.turndown.addRule('fencedCodeBlock', {
+                    filter: function (node) {
+                        return node.nodeName === 'PRE';
+                    },
+                    replacement: function (content, node) {
+                        const code = node.querySelector('code');
+                        // Use textContent to strip all hljs <span> tags
+                        let text = code ? code.textContent : node.textContent;
+                        // Remove leading/trailing newlines only
+                        text = text.replace(/^\n+/, '').replace(/\n+$/, '');
+                        // Detect language from <code> class
+                        let lang = '';
+                        if (code) {
+                            const langClass = Array.from(code.classList).find(c => c.startsWith('language-'));
+                            lang = langClass ? langClass.replace('language-', '') : '';
+                            // Strip "hljs" from lang if present (e.g. "python hljs" → "python")
+                            lang = lang.replace(/\s*hljs\s*/, '').trim();
+                        }
+                        return '\n\n```' + lang + '\n' + text + '\n```\n\n';
+                    }
                 });
 
                 // Add rule to skip empty bold/italic tags that cause ** on empty lines
@@ -182,7 +209,21 @@ const Main = {
             Modals.showInfo(I18n.get('error_title'), I18n.get('converter_error'));
             return;
         }
-        const md = this.turndown.turndown(Editor.contentArea.innerHTML);
+        let md = this.turndown.turndown(Editor.contentArea.innerHTML);
+
+        // Post-processing: clean up extra whitespace
+        // Remove lines that are just ** or __ (empty bold/italic artifacts)
+        md = md.replace(/^\s*(\*\*|__)\s*$/gm, '');
+        // Clean whitespace-only lines (from <div><br></div> etc.)
+        md = md.replace(/^\s+$/gm, '');
+        // Collapse 3+ consecutive newlines into 2 (max one blank line)
+        md = md.replace(/\n{3,}/g, '\n\n');
+        // Unescape markdown special chars that TurndownService over-escapes
+        md = md.replace(/^\\-/gm, '-');
+        md = md.replace(/^\\(\d+)\./gm, '$1.');
+        // Trim leading/trailing whitespace
+        md = md.trim();
+
         const fileName = `${Editor.currentDoc.title}.md`;
         this.downloadFile(fileName, md);
     },
