@@ -209,7 +209,17 @@ const Main = {
             Modals.showInfo(I18n.get('error_title'), I18n.get('converter_error'));
             return;
         }
-        let md = this.turndown.turndown(Editor.contentArea.innerHTML);
+        // Pre-process HTML: normalize div structure for proper line breaks
+        // Editor wraps each line in <div>, TurndownService treats <div> as paragraph (double newline)
+        let html = Editor.contentArea.innerHTML;
+        // Replace empty divs (blank line indicators in editor) with <br><br> (paragraph break)
+        html = html.replace(/<div>\s*(?:<br\s*\/?>)?\s*<\/div>/gi, '<br><br>');
+        // Replace </div><div> boundaries between content divs with <br> (line break)
+        html = html.replace(/<\/div>\s*<div(?:\s[^>]*)?>/gi, '<br>');
+        // Strip remaining opening/closing div tags
+        html = html.replace(/<\/?div(?:\s[^>]*)?>/gi, '');
+
+        let md = this.turndown.turndown(html);
 
         // Post-processing: clean up extra whitespace
         // Remove lines that are just ** or __ (empty bold/italic artifacts)
@@ -220,7 +230,11 @@ const Main = {
         md = md.replace(/\n{3,}/g, '\n\n');
         // Unescape markdown special chars that TurndownService over-escapes
         md = md.replace(/^\\-/gm, '-');
-        md = md.replace(/^\\(\d+)\./gm, '$1.');
+        md = md.replace(/^(\s*)\\(\d+)\./gm, '$1$2.');
+        // Unescape \. after digits anywhere (e.g. "1\." → "1.")
+        md = md.replace(/(\d)\\\./g, '$1.');
+        // Unescape underscores (e.g. "name\_suffix" → "name_suffix")
+        md = md.replace(/\\_/g, '_');
         // Trim leading/trailing whitespace
         md = md.trim();
 

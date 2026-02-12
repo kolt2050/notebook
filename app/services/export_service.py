@@ -21,34 +21,86 @@ async def export_all_to_markdown(db: AsyncSession) -> str:
     for doc in docs:
         content = doc.content or ""
         
-        # Protect <img> tags with style attributes (to preserve resized dimensions)
+        # === Step 1: Protect <img> tags with style attributes (preserve resized dimensions) ===
         protected_imgs = []
         def protect_img(match):
             placeholder = f"---IMG_PROTECT_{len(protected_imgs)}---"
             protected_imgs.append(match.group(0))
             return placeholder
         
-        # Protect images with style OR width/height attributes
-        content_with_placeholders = re.sub(r'<img[^>]+(?:style|width|height)=[^>]+>', protect_img, content)
+        content = re.sub(r'<img[^>]+(?:style|width|height)=[^>]+>', protect_img, content)
         
-        markdown_text = h.handle(content_with_placeholders)
+        # === Step 2: Extract <pre> blocks and replace with placeholders ===
+        protected_code_blocks = []
+        def protect_pre(match):
+            pre_html = match.group(0)
+            placeholder = f"---CODE_BLOCK_{len(protected_code_blocks)}---"
+            
+            # Extract language from <code class="language-xxx">
+            lang_match = re.search(r'class="[^"]*language-(\w+)', pre_html)
+            lang = lang_match.group(1) if lang_match else ''
+            # Strip "hljs" if it's the only language
+            if lang == 'hljs':
+                lang = ''
+            
+            # Extract plain text (strip all HTML tags inside <pre>)
+            text = re.sub(r'<[^>]+>', '', pre_html)
+            # Unescape HTML entities
+            text = text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&').replace('&quot;', '"')
+            text = text.strip('\n')
+            
+            protected_code_blocks.append((lang, text))
+            return placeholder
         
-        # Restore protected images WITHOUT adding manual newlines (as per user request)
+        content = re.sub(r'<pre[^>]*>.*?</pre>', protect_pre, content, flags=re.DOTALL)
+        
+        # === Step 2.5: Normalize div structure for proper line breaks ===
+        # Editor uses <div> for each line. html2text treats <div> as paragraph (double newline).
+        # Fix: empty divs = blank lines, consecutive content divs = single line breaks.
+        
+        # First: replace empty divs (blank line indicators) with <br><br> (paragraph break)
+        content = re.sub(r'<div>\s*(?:<br\s*/?>)?\s*</div>', '<br><br>', content)
+        
+        # Then: replace </div><div> boundaries between content divs with <br> (line break)
+        content = re.sub(r'</div>\s*<div(?:\s[^>]*)?>', '<br>', content)
+        
+        # Strip remaining opening/closing div tags
+        content = re.sub(r'</?div(?:\s[^>]*)?>', '', content)
+        
+        # === Step 3: Convert remaining HTML to markdown ===
+        markdown_text = h.handle(content)
+        
+        # === Step 4: Restore protected images ===
         for i, img_tag in enumerate(protected_imgs):
             placeholder = f"---IMG_PROTECT_{i}---"
             markdown_text = markdown_text.replace(placeholder, img_tag)
         
-        # Aggressively remove stray backslashes that html2text adds before tags or newlines
+        # === Step 5: Restore code blocks as fenced markdown ===
+        for i, (lang, text) in enumerate(protected_code_blocks):
+            placeholder = f"---CODE_BLOCK_{i}---"
+            fenced = f"\n```{lang}\n{text}\n```\n"
+            markdown_text = markdown_text.replace(placeholder, fenced)
+        
+        # === Step 6: Post-processing cleanup ===
+        # Remove stray backslashes before tags or newlines
         markdown_text = re.sub(r'\\(?=\s*<)', '', markdown_text)
         markdown_text = re.sub(r'\\\s*\n', '\n', markdown_text)
         
-        # Clean up empty bold/italic markers like **, __, * *, etc.
-        markdown_text = re.sub(r'(\*\*|__|^\*|^_)\s+\1', '', markdown_text)
-        markdown_text = re.sub(r'^\s*(\*\*|__|^\*|^_)\s*$', '', markdown_text, flags=re.MULTILINE)
+        # Clean up empty bold/italic markers
+        markdown_text = re.sub(r'^\s*(\*\*|__)\s*$', '', markdown_text, flags=re.MULTILINE)
         markdown_text = re.sub(r'\n\s*(\*+|_)\s*\n', '\n\n', markdown_text)
         
-        # FINAL NORMALIZATION: collapse any sequence of 4+ newlines to exactly 3 (2 blank lines)
-        markdown_text = re.sub(r'(\r?\n\s*){4,}', '\n\n\n', markdown_text).strip()
+        # Unescape markdown special chars (list markers)
+        markdown_text = re.sub(r'^\\-', '-', markdown_text, flags=re.MULTILINE)
+        markdown_text = re.sub(r'^(\s*)\\(\d+)\.', r'\1\2.', markdown_text, flags=re.MULTILINE)
+        # Also unescape \. after digits anywhere (html2text escapes N. patterns)
+        markdown_text = re.sub(r'(\d)\\\.', r'\1.', markdown_text)
+        # Unescape underscores (e.g. "name\_suffix" → "name_suffix")
+        markdown_text = markdown_text.replace('\\_', '_')
+        
+        # Clean whitespace-only lines, then collapse 3+ newlines to 2
+        markdown_text = re.sub(r'^\s+$', '', markdown_text, flags=re.MULTILINE)
+        markdown_text = re.sub(r'\n{3,}', '\n\n', markdown_text).strip()
         
         md_content += f"# {doc.title}\n"
         
