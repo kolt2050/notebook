@@ -1,5 +1,6 @@
 services:
   notebook-app:
+    image: notebook-app
     build: .
     ports:
       - "8005:8005"
