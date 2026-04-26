@@ -4,8 +4,8 @@ const I18n = {
         EN: {
           app_title: "Notebook",
           add_doc: "Add Document",
-          backup_db: "Backup",
-          import_db: "Import",
+          backup_db: "Backup JSON",
+          import_db: "Import JSON",
           confirm_import_title: "Import Data?",
           confirm_import_text: "This will overwrite all current documents. Are you sure?",
             search_placeholder: "Search...",
@@ -39,8 +39,8 @@ const I18n = {
         RU: {
           app_title: "Блокнот",
           add_doc: "Добавить документ",
-          backup_db: "Бэкап",
-          import_db: "Импорт",
+          backup_db: "Бэкап JSON",
+          import_db: "Импорт JSON",
           confirm_import_title: "Импорт данных?",
           confirm_import_text: "Это ПОЛНОСТЬЮ ПЕРЕЗАПИШЕТ текущие данные. Вы уверены?",
             search_placeholder: "Поиск...",

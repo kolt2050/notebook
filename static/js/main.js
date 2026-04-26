@@ -86,6 +86,55 @@ const Main = {
             console.log('[Auto-save] Periodic trigger');
             Editor.save();
         }, 5 * 60 * 1000);
+
+        await this.loadShortcuts();
+        this.showDashboard();
+    },
+
+    async loadShortcuts() {
+        const shortcuts = await API.getShortcuts();
+        const container = document.getElementById('shortcuts-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+        shortcuts.forEach(s => {
+            const a = document.createElement('a');
+            a.href = s.url;
+            a.target = '_blank';
+            a.className = 'shortcut-card';
+            a.innerHTML = `<div class="shortcut-icon">${s.icon || '🔗'}</div><div class="shortcut-title">${s.title}</div>`;
+            container.appendChild(a);
+        });
+
+        const addBtn = document.createElement('div');
+        addBtn.className = 'shortcut-card add-shortcut';
+        addBtn.textContent = '+ Add';
+        addBtn.onclick = () => this.addShortcut();
+        container.appendChild(addBtn);
+    },
+
+    async addShortcut() {
+        const title = prompt(I18n.get('shortcut_title_prompt') || 'Shortcut Name:');
+        if (!title) return;
+        const url = prompt(I18n.get('shortcut_url_prompt') || 'URL (starts with http/https):');
+        if (!url) return;
+        const icon = prompt(I18n.get('shortcut_icon_prompt') || 'Icon (emoji or text):', '🌐') || '🌐';
+
+        const shortcuts = await API.getShortcuts();
+        shortcuts.push({ id: Date.now().toString(), title, url, icon });
+        await API.saveShortcuts(shortcuts);
+        await this.loadShortcuts();
+    },
+
+    showDashboard() {
+        document.getElementById('welcome-view').style.display = 'flex';
+        document.getElementById('editor-view').style.display = 'none';
+        Tree.deselect();
+    },
+
+    hideDashboard() {
+        document.getElementById('welcome-view').style.display = 'none';
+        document.getElementById('editor-view').style.display = 'flex';
     },
 
     initResizer() {
@@ -130,6 +179,18 @@ const Main = {
     },
 
     addEventListeners() {
+        const homeBtn = document.getElementById('home-btn');
+        if (homeBtn) homeBtn.onclick = () => this.showDashboard();
+        
+        const welcomeAddBtn = document.getElementById('welcome-add-btn');
+        if (welcomeAddBtn) welcomeAddBtn.onclick = () => this.addNew();
+        
+        const welcomeExportShortcutsBtn = document.getElementById('welcome-export-shortcuts-btn');
+        if (welcomeExportShortcutsBtn) welcomeExportShortcutsBtn.onclick = () => this.exportShortcuts();
+        
+        const welcomeImportShortcutsBtn = document.getElementById('welcome-import-shortcuts-btn');
+        if (welcomeImportShortcutsBtn) welcomeImportShortcutsBtn.onclick = () => this.importShortcuts();
+
         document.getElementById('lang-toggle-btn').onclick = () => I18n.toggle();
         document.getElementById('add-doc-btn').onclick = () => this.addNew();
 
@@ -191,6 +252,7 @@ const Main = {
             });
             await Tree.refresh();
             await Tree.selectItem(newItem);
+            this.hideDashboard();
 
             // Focus title and select text for quick renaming
             Editor.titleInput.focus();
@@ -426,6 +488,88 @@ const Main = {
         },
         'danger'
       );
+    },
+  
+    async exportShortcuts() {
+      try {
+        const data = await API.backupShortcuts();
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+  
+        if ('showSaveFilePicker' in window) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: 'notebook.home.json',
+              types: [{
+                description: 'Shortcuts Backup',
+                accept: { 'application/json': ['.json'] }
+              }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              console.error('Backup failed:', err);
+              this.downloadFile('notebook.home.json', json);
+            }
+          }
+        } else {
+          this.downloadFile('notebook.home.json', json);
+        }
+      } catch (err) {
+        console.error('Backup failed:', err);
+        Modals.showInfo(I18n.get('error_title'), err.message || 'Export failed');
+      }
+    },
+  
+    async importShortcuts() {
+      try {
+        let file;
+        if ('showOpenFilePicker' in window) {
+          const [handle] = await window.showOpenFilePicker({
+            types: [{
+              description: 'Shortcuts Backup',
+              accept: { 'application/json': ['.json'] }
+            }],
+            multiple: false
+          });
+          file = await handle.getFile();
+        } else {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          file = await new Promise((resolve) => {
+            input.onchange = () => resolve(input.files[0]);
+            input.click();
+          });
+        }
+  
+        if (!file) return;
+  
+        const text = await file.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          alert('Import failed: invalid JSON file');
+          return;
+        }
+  
+        if (data.type !== 'shortcuts') {
+          alert('Import failed: Not a valid shortcuts file.');
+          return;
+        }
+  
+        await API.importShortcuts(data);
+        await this.loadShortcuts();
+        Modals.showInfo(I18n.get('notice_title') || 'Notice', 'Shortcuts imported successfully');
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Import failed:', err);
+          alert('Import failed: ' + err.message);
+        }
+      }
     }
 };
 

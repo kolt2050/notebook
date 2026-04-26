@@ -212,6 +212,7 @@ const Tree = {
 
         const fullDoc = await API.getDocument(item.id);
         Editor.load(fullDoc);
+        if (Main.hideDashboard) Main.hideDashboard();
     },
 
     async deleteItem(item) {

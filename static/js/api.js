@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   NEXT_ID: 'notebook_next_id',
   IMAGES: 'notebook_images',
   NEXT_IMG_ID: 'notebook_next_img_id',
+  SHORTCUTS: 'notebook_shortcuts',
 };
 
 // Helper: read from storage
@@ -242,6 +243,19 @@ const API = {
     };
   },
 
+  // --- Shortcuts for Dashboard ---
+  async getShortcuts() {
+    const shortcuts = await _get(STORAGE_KEYS.SHORTCUTS);
+    return Array.isArray(shortcuts) ? shortcuts : [
+      { id: '1', title: 'Google', url: 'https://google.com', icon: '🔍' },
+      { id: '2', title: 'GitHub', url: 'https://github.com', icon: '💻' }
+    ];
+  },
+
+  async saveShortcuts(shortcuts) {
+    await _set({ [STORAGE_KEYS.SHORTCUTS]: shortcuts });
+  },
+
   // --- Export all documents as Markdown ---
   async exportAllMarkdown() {
     const docs = await _getAllDocs();
@@ -271,6 +285,16 @@ const API = {
     };
   },
 
+  async backupShortcuts() {
+    const shortcuts = await _get(STORAGE_KEYS.SHORTCUTS);
+    return {
+      shortcuts: Array.isArray(shortcuts) ? shortcuts : [],
+      exported_at: new Date().toISOString(),
+      version: 1,
+      type: 'shortcuts'
+    };
+  },
+
   // --- Import: replace all data from JSON ---
   async importData(data) {
     if (!data || !Array.isArray(data.documents)) {
@@ -285,5 +309,17 @@ const API = {
     });
 
     return { status: 'success', message: 'Database imported successfully' };
+  },
+
+  async importShortcuts(data) {
+    if (!data || !Array.isArray(data.shortcuts)) {
+      throw new Error('Invalid import data: missing shortcuts array');
+    }
+
+    await _set({
+      [STORAGE_KEYS.SHORTCUTS]: data.shortcuts
+    });
+
+    return { status: 'success', message: 'Shortcuts imported successfully' };
   }
 };
