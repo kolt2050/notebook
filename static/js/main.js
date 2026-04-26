@@ -97,9 +97,13 @@ const Main = {
         if (!container) return;
 
         container.innerHTML = '';
-        shortcuts.forEach(s => {
+        
+        let draggedIndex = -1;
+
+        shortcuts.forEach((s, index) => {
             const card = document.createElement('div');
             card.className = 'shortcut-card';
+            card.draggable = true;
 
             let targetUrl = s.url.trim();
             // Remove wrapping quotes if the user pasted them
@@ -119,6 +123,42 @@ const Main = {
                 <div class="shortcut-icon">${s.icon || '🔗'}</div>
                 <div class="shortcut-title">${s.title}</div>
             `;
+            
+            card.addEventListener('dragstart', (e) => {
+                draggedIndex = index;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => card.style.opacity = '0.5', 0);
+            });
+
+            card.addEventListener('dragend', () => {
+                card.style.opacity = '1';
+                document.querySelectorAll('.shortcut-card').forEach(c => c.style.transform = '');
+            });
+
+            card.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (draggedIndex === -1 || draggedIndex === index) return;
+                card.style.transform = 'scale(1.05)';
+                card.style.zIndex = '1';
+            });
+
+            card.addEventListener('dragleave', () => {
+                card.style.transform = '';
+                card.style.zIndex = '';
+            });
+
+            card.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                card.style.transform = '';
+                card.style.zIndex = '';
+                if (draggedIndex === -1 || draggedIndex === index) return;
+
+                const draggedItem = shortcuts.splice(draggedIndex, 1)[0];
+                shortcuts.splice(index, 0, draggedItem);
+                await API.saveShortcuts(shortcuts);
+                await this.loadShortcuts();
+            });
             
             card.onclick = (e) => {
                 if (e.target.closest('.shortcut-actions-overlay')) return;
@@ -147,6 +187,28 @@ const Main = {
         addBtn.className = 'shortcut-card add-shortcut';
         addBtn.textContent = '+ Add';
         addBtn.onclick = () => this.addShortcut();
+        
+        addBtn.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (draggedIndex === -1) return;
+            addBtn.style.transform = 'scale(1.05)';
+        });
+        
+        addBtn.addEventListener('dragleave', () => {
+            addBtn.style.transform = '';
+        });
+        
+        addBtn.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            addBtn.style.transform = '';
+            if (draggedIndex === -1 || draggedIndex === shortcuts.length - 1) return;
+            const draggedItem = shortcuts.splice(draggedIndex, 1)[0];
+            shortcuts.push(draggedItem);
+            await API.saveShortcuts(shortcuts);
+            await this.loadShortcuts();
+        });
+        
         container.appendChild(addBtn);
     },
 
@@ -192,6 +254,9 @@ const Main = {
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="shortcut-title" placeholder="Name">
                 <input type="text" id="shortcut-url" placeholder="URL (http/https or C:/...)">
+                <select id="shortcut-bookmark-select" style="display: none; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color);">
+                    <option value="">-- Choose from browser bookmarks --</option>
+                </select>
                 <input type="hidden" id="shortcut-icon" value="🌐">
                 ${this.getIconSelectionHTML('🌐')}
             </div>
@@ -209,6 +274,52 @@ const Main = {
             await this.loadShortcuts();
         });
         this.setupIconSelection();
+        this.loadBrowserBookmarks();
+    },
+
+    loadBrowserBookmarks() {
+        const select = document.getElementById('shortcut-bookmark-select');
+        if (!select || !window.chrome || !chrome.bookmarks) return;
+
+        chrome.bookmarks.getTree((bookmarkTreeNodes) => {
+            const bookmarksList = [];
+            
+            const traverseBookmarks = (nodes, path) => {
+                for (const node of nodes) {
+                    if (node.url) {
+                        bookmarksList.push({ title: node.title || node.url, url: node.url, path: path });
+                    }
+                    if (node.children) {
+                        const newPath = path ? `${path} > ${node.title}` : node.title;
+                        traverseBookmarks(node.children, newPath);
+                    }
+                }
+            };
+            
+            traverseBookmarks(bookmarkTreeNodes, '');
+            
+            if (bookmarksList.length > 0) {
+                select.style.display = 'block';
+                bookmarksList.forEach(b => {
+                    const option = document.createElement('option');
+                    option.value = b.url;
+                    option.textContent = b.path ? `${b.path} > ${b.title}` : b.title;
+                    option.dataset.title = b.title;
+                    select.appendChild(option);
+                });
+                
+                select.addEventListener('change', (e) => {
+                    const url = e.target.value;
+                    if (url) {
+                        document.getElementById('shortcut-url').value = url;
+                        const selectedOption = select.options[select.selectedIndex];
+                        if (selectedOption) {
+                            document.getElementById('shortcut-title').value = selectedOption.dataset.title;
+                        }
+                    }
+                });
+            }
+        });
     },
 
     async editShortcut(id) {

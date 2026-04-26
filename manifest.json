@@ -3,7 +3,7 @@
   "name": "Portable Notebook",
   "version": "1.0.0",
   "description": "Portable Notebook — заметки с древовидной структурой, хранящиеся локально в браузере",
-  "permissions": ["storage", "unlimitedStorage"],
+  "permissions": ["storage", "unlimitedStorage", "bookmarks"],
   "action": {
     "default_title": "Notebook",
     "default_icon": {
