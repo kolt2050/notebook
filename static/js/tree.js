@@ -1,6 +1,8 @@
 const Tree = {
     container: document.getElementById('tree-container'),
     selectedId: null,
+    collapsedIds: new Set(JSON.parse(localStorage.getItem('collapsedIds') || '[]')),
+
 
     async refresh() {
         const treeData = await API.getTree();
@@ -26,6 +28,22 @@ const Tree = {
         Editor.clear();
         this.refresh();
     },
+
+    toggleCollapse(id, e) {
+        if (e) e.stopPropagation();
+        if (this.collapsedIds.has(id)) {
+            this.collapsedIds.delete(id);
+        } else {
+            this.collapsedIds.add(id);
+        }
+        localStorage.setItem('collapsedIds', JSON.stringify([...this.collapsedIds]));
+        
+        const li = this.container.querySelector(`li[data-id="${id}"]`);
+        if (li) {
+            li.classList.toggle('collapsed');
+        }
+    },
+
 
     render(data) {
         this.container.innerHTML = '';
@@ -63,16 +81,23 @@ const Tree = {
 
     createItem(item) {
         const li = document.createElement('li');
-        li.className = 'tree-item';
+        li.className = `tree-item ${this.collapsedIds.has(item.id) ? 'collapsed' : ''}`;
         li.dataset.id = item.id;
 
         const row = document.createElement('div');
         row.className = `tree-row ${this.selectedId === item.id ? 'selected' : ''}`;
         row.dataset.id = item.id;
 
+        const toggle = document.createElement('span');
+        const hasChildren = item.children && item.children.length > 0;
+        toggle.className = `tree-toggle ${hasChildren ? '' : 'empty'}`;
+        toggle.textContent = '▼';
+        toggle.onclick = (e) => this.toggleCollapse(item.id, e);
+
         const icon = document.createElement('span');
         icon.className = 'tree-icon';
-        icon.textContent = '📄';
+        icon.textContent = hasChildren ? '📁' : '📄';
+
 
         const title = document.createElement('span');
         title.className = 'tree-title';
@@ -107,10 +132,12 @@ const Tree = {
         actions.appendChild(addBtn);
         actions.appendChild(deleteBtn);
 
+        row.appendChild(toggle);
         row.appendChild(icon);
         row.appendChild(title);
         row.appendChild(actions);
         li.appendChild(row);
+
 
         row.onmousedown = (e) => {
             // If click is on an action button, don't select the item
