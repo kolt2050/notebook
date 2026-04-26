@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-sqlalchemy
-aiosqlite
-python-multipart
-pydantic
-pydantic-settings
-html2text
-httpx
