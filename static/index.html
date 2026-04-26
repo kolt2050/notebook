@@ -65,10 +65,10 @@
                 </div>
                 <h1 class="welcome-title" data-i18n="welcome_title">Welcome to Notebook</h1>
                 
-                <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 800px;">
-                    <div class="dashboard-section">
+                <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 100%; width: 100%; flex: 1; margin-bottom: 20px;">
+                    <div class="dashboard-section" style="display: flex; flex-direction: column; height: 100%;">
                         <h2 data-i18n="shortcuts_title">Shortcuts</h2>
-                        <div id="shortcuts-container" class="shortcut-cards">
+                        <div id="shortcuts-container" class="shortcut-cards" style="flex: 1; align-content: flex-start; overflow-y: auto; padding: 10px; margin: -10px;">
                             <!-- Shortcuts rendered here -->
                         </div>
                     </div>
