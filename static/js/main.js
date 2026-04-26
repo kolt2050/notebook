@@ -119,12 +119,17 @@ const Main = {
                 card.style.backgroundColor = s.bgColor;
             }
 
+            let iconHtml = s.icon || '🔗';
+            if (iconHtml.startsWith('http://') || iconHtml.startsWith('https://')) {
+                iconHtml = `<img src="${iconHtml}" style="width: 1em; height: 1em; object-fit: contain; border-radius: 4px;">`;
+            }
+
             card.innerHTML = `
                 <div class="shortcut-actions-overlay">
                     <button class="shortcut-action-btn edit-btn" title="Edit">✏️</button>
                     <button class="shortcut-action-btn delete-btn" title="Delete">🗑️</button>
                 </div>
-                <div class="shortcut-icon">${s.icon || '🔗'}</div>
+                <div class="shortcut-icon" style="display: flex; align-items: center; justify-content: center;">${iconHtml}</div>
                 <div class="shortcut-title">${s.title}</div>
             `;
             
@@ -224,10 +229,16 @@ const Main = {
         ];
         let html = '<div style="font-size: 0.9em; margin-top: 5px; color: var(--text-dim);">Select Icon:</div>';
         html += '<div class="icon-grid" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; justify-content: flex-start; max-height: 180px; overflow-y: auto; padding-right: 5px;">';
+        
+        const isUrlIcon = selectedIcon && selectedIcon.startsWith('http');
+        if (isUrlIcon) {
+            html += `<div class="icon-option selected" data-icon="${selectedIcon}" style="font-size: 1.6rem; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; border: 2px solid var(--accent-color); background: rgba(88,166,255,0.1); display: flex; align-items: center; justify-content: center;"><img src="${selectedIcon}" style="width: 1em; height: 1em; border-radius: 4px; object-fit: contain;"></div>`;
+        }
+
         icons.forEach(icon => {
-            const isSelected = icon === selectedIcon ? 'selected' : '';
+            const isSelected = (!isUrlIcon && icon === selectedIcon) ? 'selected' : '';
             const borderStyle = isSelected ? 'border: 2px solid var(--accent-color); background: rgba(88,166,255,0.1);' : 'border: 2px solid transparent;';
-            html += `<div class="icon-option ${isSelected}" data-icon="${icon}" style="font-size: 1.6rem; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; ${borderStyle}">${icon}</div>`;
+            html += `<div class="icon-option ${isSelected}" data-icon="${icon}" style="font-size: 1.6rem; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; ${borderStyle}">${icon}</div>`;
         });
         html += '</div>';
         return html;
@@ -251,6 +262,37 @@ const Main = {
                 iconInput.value = opt.dataset.icon;
             };
         });
+
+        const urlInput = document.getElementById('shortcut-url');
+        if (urlInput) {
+            urlInput.addEventListener('blur', () => {
+                const url = urlInput.value.trim();
+                if ((iconInput.value === '🌐' || iconInput.value.startsWith('http')) && url.startsWith('http')) {
+                    try {
+                        const urlObj = new URL(url);
+                        const faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
+                        
+                        let targetOpt = document.querySelector(`.icon-option[data-icon="${iconInput.value}"]`);
+                        if (!targetOpt) targetOpt = document.querySelector('.icon-option[data-icon="🌐"]');
+
+                        if (targetOpt) {
+                            targetOpt.innerHTML = `<img src="${faviconUrl}" style="width: 1em; height: 1em; border-radius: 4px; object-fit: contain;">`;
+                            targetOpt.dataset.icon = faviconUrl;
+                            iconInput.value = faviconUrl;
+                            
+                            options.forEach(o => {
+                                o.classList.remove('selected');
+                                o.style.border = '2px solid transparent';
+                                o.style.background = 'transparent';
+                            });
+                            targetOpt.classList.add('selected');
+                            targetOpt.style.border = '2px solid var(--accent-color)';
+                            targetOpt.style.background = 'rgba(88,166,255,0.1)';
+                        }
+                    } catch(e) {}
+                }
+            });
+        }
     },
 
     async addShortcut() {
@@ -272,10 +314,17 @@ const Main = {
         Modals.show('Add Shortcut', bodyHtml, async () => {
             const title = document.getElementById('shortcut-title').value.trim();
             const url = document.getElementById('shortcut-url').value.trim();
-            const icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
+            let icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
             const bgColor = document.getElementById('shortcut-color').value;
             
             if (!title || !url) return;
+
+            if (icon === '🌐' && url.startsWith('http')) {
+                try {
+                    const urlObj = new URL(url);
+                    icon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
+                } catch(e) {}
+            }
 
             const shortcuts = await API.getShortcuts();
             shortcuts.push({ id: Date.now().toString(), title, url, icon, bgColor });
@@ -320,11 +369,13 @@ const Main = {
                 select.addEventListener('change', (e) => {
                     const url = e.target.value;
                     if (url) {
-                        document.getElementById('shortcut-url').value = url;
+                        const urlInput = document.getElementById('shortcut-url');
+                        urlInput.value = url;
                         const selectedOption = select.options[select.selectedIndex];
                         if (selectedOption) {
                             document.getElementById('shortcut-title').value = selectedOption.dataset.title;
                         }
+                        urlInput.dispatchEvent(new Event('blur'));
                     }
                 });
             }
@@ -354,6 +405,13 @@ const Main = {
             shortcut.icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
             shortcut.bgColor = document.getElementById('shortcut-color').value;
             
+            if (shortcut.icon === '🌐' && shortcut.url.startsWith('http')) {
+                try {
+                    const urlObj = new URL(shortcut.url);
+                    shortcut.icon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
+                } catch(e) {}
+            }
+
             if (!shortcut.title || !shortcut.url) return;
             await API.saveShortcuts(shortcuts);
             await this.loadShortcuts();
