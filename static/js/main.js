@@ -243,15 +243,13 @@ const Main = {
     },
 
     async exportAll() {
-        try {
-            const response = await fetch('/api/export/all');
-            if (!response.ok) throw new Error('Export failed');
-            const md = await response.text();
-            this.downloadFile('notebook_export.md', md);
-        } catch (err) {
-            console.error('Export All failed:', err);
-            Modals.showInfo(I18n.get('error_title'), I18n.get('export_all_error'));
-        }
+      try {
+        const md = await API.exportAllMarkdown();
+        this.downloadFile('notebook_export.md', md);
+      } catch (err) {
+        console.error('Export All failed:', err);
+        Modals.showInfo(I18n.get('error_title'), I18n.get('export_all_error'));
+      }
     },
 
     async refreshStats() {
@@ -340,85 +338,94 @@ const Main = {
     },
 
     async backupDb() {
+      try {
+        const data = await API.backupData();
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+  
         if ('showSaveFilePicker' in window) {
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: 'notebook.backup.db',
-                    types: [{
-                        description: 'SQLite Database',
-                        accept: { 'application/x-sqlite3': ['.db'] }
-                    }]
-                });
-
-                const response = await fetch('/api/backup/db');
-                const blob = await response.blob();
-
-                const writable = await handle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error('Backup failed:', err);
-                    window.open('/api/backup/db', '_blank');
-                }
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: 'notebook.backup.json',
+              types: [{
+                description: 'Notebook Backup',
+                accept: { 'application/json': ['.json'] }
+              }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              console.error('Backup failed:', err);
+              // Fallback: download via blob URL
+              this.downloadFile('notebook.backup.json', json);
             }
+          }
         } else {
-            window.open('/api/backup/db', '_blank');
+          this.downloadFile('notebook.backup.json', json);
         }
+      } catch (err) {
+        console.error('Backup failed:', err);
+        Modals.showInfo(I18n.get('error_title'), err.message || 'Backup failed');
+      }
     },
-
+  
     async importDb() {
-        Modals.showConfirm(
-            I18n.get('confirm_import_title'),
-            I18n.get('confirm_import_text'),
-            async () => {
-                try {
-                    let file;
-                    if ('showOpenFilePicker' in window) {
-                        const [handle] = await window.showOpenFilePicker({
-                            types: [{
-                                description: 'SQLite Database',
-                                accept: { 'application/x-sqlite3': ['.db'] }
-                            }],
-                            multiple: false
-                        });
-                        file = await handle.getFile();
-                    } else {
-                        // Fallback for browsers without showOpenFilePicker
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = '.db';
-                        file = await new Promise((resolve) => {
-                            input.onchange = () => resolve(input.files[0]);
-                            input.click();
-                        });
-                    }
-
-                    if (!file) return;
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    const response = await fetch('/api/import/db/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        window.location.reload();
-                    } else {
-                        const err = await response.json();
-                        alert(err.detail || 'Import failed');
-                    }
-                } catch (err) {
-                    if (err.name !== 'AbortError') {
-                        console.error('Import failed:', err);
-                        alert('Import failed: ' + err.message);
-                    }
-                }
-            },
-            'danger'
-        );
+      Modals.showConfirm(
+        I18n.get('confirm_import_title'),
+        I18n.get('confirm_import_text'),
+        async () => {
+          try {
+            let file;
+            if ('showOpenFilePicker' in window) {
+              const [handle] = await window.showOpenFilePicker({
+                types: [{
+                  description: 'Notebook Backup',
+                  accept: { 'application/json': ['.json'] }
+                }],
+                multiple: false
+              });
+              file = await handle.getFile();
+            } else {
+              // Fallback for browsers without showOpenFilePicker
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.json';
+              file = await new Promise((resolve) => {
+                input.onchange = () => resolve(input.files[0]);
+                input.click();
+              });
+            }
+  
+            if (!file) return;
+  
+            // Read and parse JSON file
+            const text = await file.text();
+            let data;
+            try {
+              data = JSON.parse(text);
+            } catch (e) {
+              alert('Import failed: invalid JSON file');
+              return;
+            }
+  
+            // Import data into chrome.storage
+            await API.importData(data);
+  
+            // Reload the UI
+            await Tree.refresh();
+            Editor.clear();
+            Main.refreshStats();
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              console.error('Import failed:', err);
+              alert('Import failed: ' + err.message);
+            }
+          }
+        },
+        'danger'
+      );
     }
 };
 

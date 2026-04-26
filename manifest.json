@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Portable Notebook",
+  "version": "1.0.0",
+  "description": "Portable Notebook — заметки с древовидной структурой, хранящиеся локально в браузере",
+  "permissions": ["storage", "unlimitedStorage"],
+  "action": {
+    "default_title": "Notebook",
+    "default_icon": {
+      "16": "static/img/logo-light.png",
+      "48": "static/img/logo-light.png",
+      "128": "static/img/logo-light.png"
+    }
+  },
+  "background": {
+    "service_worker": "static/js/background.js"
+  },
+  "icons": {
+    "16": "static/img/logo-light.png",
+    "48": "static/img/logo-light.png",
+    "128": "static/img/logo-light.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
+  }
+}

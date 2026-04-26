@@ -20,6 +20,20 @@ async_session = async_sessionmaker(engine, expire_on_commit=False)
 class Base(DeclarativeBase):
     pass
 
+def recreate_engine():
+    """Re-create the async engine and sessionmaker after database file replacement.
+    
+    This is needed after importing a new .db file, because the old engine's
+    connection pool may reference the deleted/replaced file. Disposing alone
+    doesn't guarantee fresh connections on all platforms (especially Windows).
+    """
+    global engine, async_session
+    # Dispose the old engine (releases any remaining pooled connections)
+    # Note: this is synchronous but safe because dispose() on an already-disposed
+    # engine is a no-op, and we need to ensure no stale connections remain.
+    engine = create_async_engine(DATABASE_URL, echo=True)
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+
 async def get_db():
     async with async_session() as session:
         yield session

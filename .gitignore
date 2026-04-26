@@ -15,4 +15,6 @@ Thumbs.db
 
 # Project Specific
 data/*.db
+notebook.db
+*.json
 .agent/
