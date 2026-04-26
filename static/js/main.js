@@ -113,6 +113,8 @@ const Main = {
 
             if (/^[a-zA-Z]:[\\/]/.test(targetUrl)) {
                 targetUrl = 'file:///' + targetUrl.replace(/\\/g, '/');
+            } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('file://')) {
+                targetUrl = 'https://' + targetUrl;
             }
 
             if (s.bgColor) {
@@ -267,9 +269,13 @@ const Main = {
         if (urlInput) {
             urlInput.addEventListener('blur', () => {
                 const url = urlInput.value.trim();
-                if ((iconInput.value === '🌐' || iconInput.value.startsWith('http')) && url.startsWith('http')) {
+                if ((iconInput.value === '🌐' || iconInput.value.startsWith('http')) && url && !url.startsWith('file://') && !/^[a-zA-Z]:[\\/]/.test(url)) {
                     try {
-                        const urlObj = new URL(url);
+                        let parsedUrl = url;
+                        if (!parsedUrl.startsWith('http')) {
+                            parsedUrl = 'https://' + parsedUrl;
+                        }
+                        const urlObj = new URL(parsedUrl);
                         const faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
                         
                         let targetOpt = document.querySelector(`.icon-option[data-icon="${iconInput.value}"]`);
@@ -319,9 +325,13 @@ const Main = {
             
             if (!title || !url) return;
 
-            if (icon === '🌐' && url.startsWith('http')) {
+            if (icon === '🌐' && url && !url.startsWith('file://') && !/^[a-zA-Z]:[\\/]/.test(url)) {
                 try {
-                    const urlObj = new URL(url);
+                    let parsedUrl = url;
+                    if (!parsedUrl.startsWith('http')) {
+                        parsedUrl = 'https://' + parsedUrl;
+                    }
+                    const urlObj = new URL(parsedUrl);
                     icon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
                 } catch(e) {}
             }
@@ -405,9 +415,13 @@ const Main = {
             shortcut.icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
             shortcut.bgColor = document.getElementById('shortcut-color').value;
             
-            if (shortcut.icon === '🌐' && shortcut.url.startsWith('http')) {
+            if (shortcut.icon === '🌐' && shortcut.url && !shortcut.url.startsWith('file://') && !/^[a-zA-Z]:[\\/]/.test(shortcut.url)) {
                 try {
-                    const urlObj = new URL(shortcut.url);
+                    let parsedUrl = shortcut.url;
+                    if (!parsedUrl.startsWith('http')) {
+                        parsedUrl = 'https://' + parsedUrl;
+                    }
+                    const urlObj = new URL(parsedUrl);
                     shortcut.icon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
                 } catch(e) {}
             }
