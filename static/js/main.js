@@ -115,6 +115,10 @@ const Main = {
                 targetUrl = 'file:///' + targetUrl.replace(/\\/g, '/');
             }
 
+            if (s.bgColor) {
+                card.style.backgroundColor = s.bgColor;
+            }
+
             card.innerHTML = `
                 <div class="shortcut-actions-overlay">
                     <button class="shortcut-action-btn edit-btn" title="Edit">✏️</button>
@@ -257,6 +261,10 @@ const Main = {
                 <select id="shortcut-bookmark-select" style="display: none; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color);">
                     <option value="">-- Choose from browser bookmarks --</option>
                 </select>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label for="shortcut-color" style="color: var(--text-dim); font-size: 0.9em;">Background Color:</label>
+                    <input type="color" id="shortcut-color" value="#0d1117" style="background: none; border: none; padding: 0; width: 30px; height: 30px; cursor: pointer;">
+                </div>
                 <input type="hidden" id="shortcut-icon" value="🌐">
                 ${this.getIconSelectionHTML('🌐')}
             </div>
@@ -265,11 +273,12 @@ const Main = {
             const title = document.getElementById('shortcut-title').value.trim();
             const url = document.getElementById('shortcut-url').value.trim();
             const icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
+            const bgColor = document.getElementById('shortcut-color').value;
             
             if (!title || !url) return;
 
             const shortcuts = await API.getShortcuts();
-            shortcuts.push({ id: Date.now().toString(), title, url, icon });
+            shortcuts.push({ id: Date.now().toString(), title, url, icon, bgColor });
             await API.saveShortcuts(shortcuts);
             await this.loadShortcuts();
         });
@@ -331,6 +340,10 @@ const Main = {
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="shortcut-title" value="${shortcut.title.replace(/"/g, '&quot;')}">
                 <input type="text" id="shortcut-url" value="${shortcut.url.replace(/"/g, '&quot;')}">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label for="shortcut-color" style="color: var(--text-dim); font-size: 0.9em;">Background Color:</label>
+                    <input type="color" id="shortcut-color" value="${shortcut.bgColor || '#0d1117'}" style="background: none; border: none; padding: 0; width: 30px; height: 30px; cursor: pointer;">
+                </div>
                 <input type="hidden" id="shortcut-icon" value="${shortcut.icon.replace(/"/g, '&quot;')}">
                 ${this.getIconSelectionHTML(shortcut.icon)}
             </div>
@@ -339,6 +352,7 @@ const Main = {
             shortcut.title = document.getElementById('shortcut-title').value.trim();
             shortcut.url = document.getElementById('shortcut-url').value.trim();
             shortcut.icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
+            shortcut.bgColor = document.getElementById('shortcut-color').value;
             
             if (!shortcut.title || !shortcut.url) return;
             await API.saveShortcuts(shortcuts);
