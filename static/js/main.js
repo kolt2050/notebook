@@ -150,12 +150,50 @@ const Main = {
         container.appendChild(addBtn);
     },
 
+    getIconSelectionHTML(selectedIcon = '🌐') {
+        const icons = [
+            '🌐', '📁', '📄', '⚙️', '💻', '📱', '🎵', '🎮', '📚', '✉️', '📅', '📊', '🔍', '🎨', '🔐', '🛠️', '☁️', '🌟', '💡', '🏠', '🚀', '🤖', '💰', '🛒',
+            '🎬', '📷', '🎤', '🍕', '☕', '🍺', '🏋️', '🚵', '🌍', '📍', '⏰', '🔋', '📡', '💾', '🔑', '📝', '📌', '📈', '📉', '📎', '🔗', '📂', '📆', '📫', 
+            '📦', '🔔', '🔥', '💧', '⚡', '🌈', '🍎', '🍔', '🍦', '⚽', '🎾', '🎸', '🕹️', '📟', '📠', '📺', '📻', '🧭', '🔭', '🔬', '🧺', '🧼', '🧸'
+        ];
+        let html = '<div style="font-size: 0.9em; margin-top: 5px; color: var(--text-dim);">Select Icon:</div>';
+        html += '<div class="icon-grid" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; justify-content: flex-start; max-height: 180px; overflow-y: auto; padding-right: 5px;">';
+        icons.forEach(icon => {
+            const isSelected = icon === selectedIcon ? 'selected' : '';
+            const borderStyle = isSelected ? 'border: 2px solid var(--accent-color); background: rgba(88,166,255,0.1);' : 'border: 2px solid transparent;';
+            html += `<div class="icon-option ${isSelected}" data-icon="${icon}" style="font-size: 1.6rem; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; ${borderStyle}">${icon}</div>`;
+        });
+        html += '</div>';
+        return html;
+    },
+
+    setupIconSelection() {
+        const iconInput = document.getElementById('shortcut-icon');
+        const options = document.querySelectorAll('#modal-body .icon-option');
+        options.forEach(opt => {
+            opt.onmouseenter = () => { if (!opt.classList.contains('selected')) opt.style.background = 'var(--border-color)'; };
+            opt.onmouseleave = () => { if (!opt.classList.contains('selected')) opt.style.background = 'transparent'; };
+            opt.onclick = () => {
+                options.forEach(o => {
+                    o.classList.remove('selected');
+                    o.style.border = '2px solid transparent';
+                    o.style.background = 'transparent';
+                });
+                opt.classList.add('selected');
+                opt.style.border = '2px solid var(--accent-color)';
+                opt.style.background = 'rgba(88,166,255,0.1)';
+                iconInput.value = opt.dataset.icon;
+            };
+        });
+    },
+
     async addShortcut() {
         const bodyHtml = `
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="shortcut-title" placeholder="Name">
                 <input type="text" id="shortcut-url" placeholder="URL (http/https or C:/...)">
-                <input type="text" id="shortcut-icon" placeholder="Icon (e.g. 🌐)" value="🌐">
+                <input type="hidden" id="shortcut-icon" value="🌐">
+                ${this.getIconSelectionHTML('🌐')}
             </div>
         `;
         Modals.show('Add Shortcut', bodyHtml, async () => {
@@ -170,6 +208,7 @@ const Main = {
             await API.saveShortcuts(shortcuts);
             await this.loadShortcuts();
         });
+        this.setupIconSelection();
     },
 
     async editShortcut(id) {
@@ -181,7 +220,8 @@ const Main = {
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="shortcut-title" value="${shortcut.title.replace(/"/g, '&quot;')}">
                 <input type="text" id="shortcut-url" value="${shortcut.url.replace(/"/g, '&quot;')}">
-                <input type="text" id="shortcut-icon" value="${shortcut.icon.replace(/"/g, '&quot;')}">
+                <input type="hidden" id="shortcut-icon" value="${shortcut.icon.replace(/"/g, '&quot;')}">
+                ${this.getIconSelectionHTML(shortcut.icon)}
             </div>
         `;
         Modals.show('Edit Shortcut', bodyHtml, async () => {
@@ -193,6 +233,7 @@ const Main = {
             await API.saveShortcuts(shortcuts);
             await this.loadShortcuts();
         });
+        this.setupIconSelection();
     },
 
     async deleteShortcut(id) {
