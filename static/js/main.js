@@ -97,7 +97,7 @@ const Main = {
         if (!container) return;
 
         container.innerHTML = '';
-        
+
         let draggedIndex = -1;
 
         shortcuts.forEach((s, index) => {
@@ -134,7 +134,7 @@ const Main = {
                 <div class="shortcut-icon" style="display: flex; align-items: center; justify-content: center;">${iconHtml}</div>
                 <div class="shortcut-title">${s.title}</div>
             `;
-            
+
             card.addEventListener('dragstart', (e) => {
                 draggedIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
@@ -170,10 +170,10 @@ const Main = {
                 await API.saveShortcuts(shortcuts);
                 await this.loadShortcuts();
             });
-            
+
             card.onclick = (e) => {
                 if (e.target.closest('.shortcut-actions-overlay')) return;
-                
+
                 if (targetUrl.startsWith('file:///')) {
                     if (chrome && chrome.tabs && chrome.tabs.create) {
                         chrome.tabs.create({ url: targetUrl });
@@ -187,7 +187,7 @@ const Main = {
 
             const editBtn = card.querySelector('.edit-btn');
             editBtn.onclick = (e) => { e.stopPropagation(); this.editShortcut(s.id); };
-            
+
             const deleteBtn = card.querySelector('.delete-btn');
             deleteBtn.onclick = (e) => { e.stopPropagation(); this.deleteShortcut(s.id); };
 
@@ -198,18 +198,18 @@ const Main = {
         addBtn.className = 'shortcut-card add-shortcut';
         addBtn.textContent = '+ Add';
         addBtn.onclick = () => this.addShortcut();
-        
+
         addBtn.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             if (draggedIndex === -1) return;
             addBtn.style.transform = 'scale(1.05)';
         });
-        
+
         addBtn.addEventListener('dragleave', () => {
             addBtn.style.transform = '';
         });
-        
+
         addBtn.addEventListener('drop', async (e) => {
             e.preventDefault();
             addBtn.style.transform = '';
@@ -219,19 +219,19 @@ const Main = {
             await API.saveShortcuts(shortcuts);
             await this.loadShortcuts();
         });
-        
+
         container.appendChild(addBtn);
     },
 
     getIconSelectionHTML(selectedIcon = '🌐') {
         const icons = [
             '🌐', '📁', '📄', '⚙️', '💻', '📱', '🎵', '🎮', '📚', '✉️', '📅', '📊', '🔍', '🎨', '🔐', '🛠️', '☁️', '🌟', '💡', '🏠', '🚀', '🤖', '💰', '🛒',
-            '🎬', '📷', '🎤', '🍕', '☕', '🍺', '🏋️', '🚵', '🌍', '📍', '⏰', '🔋', '📡', '💾', '🔑', '📝', '📌', '📈', '📉', '📎', '🔗', '📂', '📆', '📫', 
+            '🎬', '📷', '🎤', '🍕', '☕', '🍺', '🏋️', '🚵', '🌍', '📍', '⏰', '🔋', '📡', '💾', '🔑', '📝', '📌', '📈', '📉', '📎', '🔗', '📂', '📆', '📫',
             '📦', '🔔', '🔥', '💧', '⚡', '🌈', '🍎', '🍔', '🍦', '⚽', '🎾', '🎸', '🕹️', '📟', '📠', '📺', '📻', '🧭', '🔭', '🔬', '🧺', '🧼', '🧸'
         ];
         let html = '<div style="font-size: 0.9em; margin-top: 5px; color: var(--text-dim);">Select Icon:</div>';
         html += '<div class="icon-grid" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; justify-content: flex-start; max-height: 180px; overflow-y: auto; padding-right: 5px;">';
-        
+
         const isUrlIcon = selectedIcon && selectedIcon.startsWith('http');
         if (isUrlIcon) {
             html += `<div class="icon-option selected" data-icon="${selectedIcon}" style="font-size: 1.6rem; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s; border: 2px solid var(--accent-color); background: rgba(88,166,255,0.1); display: flex; align-items: center; justify-content: center;"><img src="${selectedIcon}" style="width: 1em; height: 1em; border-radius: 4px; object-fit: contain;"></div>`;
@@ -277,7 +277,7 @@ const Main = {
                         }
                         const urlObj = new URL(parsedUrl);
                         const faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
-                        
+
                         let targetOpt = document.querySelector(`.icon-option[data-icon="${iconInput.value}"]`);
                         if (!targetOpt) targetOpt = document.querySelector('.icon-option[data-icon="🌐"]');
 
@@ -285,7 +285,7 @@ const Main = {
                             targetOpt.innerHTML = `<img src="${faviconUrl}" style="width: 1em; height: 1em; border-radius: 4px; object-fit: contain;">`;
                             targetOpt.dataset.icon = faviconUrl;
                             iconInput.value = faviconUrl;
-                            
+
                             options.forEach(o => {
                                 o.classList.remove('selected');
                                 o.style.border = '2px solid transparent';
@@ -295,7 +295,7 @@ const Main = {
                             targetOpt.style.border = '2px solid var(--accent-color)';
                             targetOpt.style.background = 'rgba(88,166,255,0.1)';
                         }
-                    } catch(e) {}
+                    } catch (e) { }
                 }
             });
         }
@@ -322,7 +322,7 @@ const Main = {
             const url = document.getElementById('shortcut-url').value.trim();
             let icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
             const bgColor = document.getElementById('shortcut-color').value;
-            
+
             if (!title || !url) return;
 
             if (icon === '🌐' && url && !url.startsWith('file://') && !/^[a-zA-Z]:[\\/]/.test(url)) {
@@ -333,7 +333,7 @@ const Main = {
                     }
                     const urlObj = new URL(parsedUrl);
                     icon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
-                } catch(e) {}
+                } catch (e) { }
             }
 
             const shortcuts = await API.getShortcuts();
@@ -351,7 +351,7 @@ const Main = {
 
         chrome.bookmarks.getTree((bookmarkTreeNodes) => {
             const bookmarksList = [];
-            
+
             const traverseBookmarks = (nodes, path) => {
                 for (const node of nodes) {
                     if (node.url) {
@@ -363,9 +363,9 @@ const Main = {
                     }
                 }
             };
-            
+
             traverseBookmarks(bookmarkTreeNodes, '');
-            
+
             if (bookmarksList.length > 0) {
                 select.style.display = 'block';
                 bookmarksList.forEach(b => {
@@ -375,7 +375,7 @@ const Main = {
                     option.dataset.title = b.title;
                     select.appendChild(option);
                 });
-                
+
                 select.addEventListener('change', (e) => {
                     const url = e.target.value;
                     if (url) {
@@ -414,7 +414,7 @@ const Main = {
             shortcut.url = document.getElementById('shortcut-url').value.trim();
             shortcut.icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
             shortcut.bgColor = document.getElementById('shortcut-color').value;
-            
+
             if (shortcut.icon === '🌐' && shortcut.url && !shortcut.url.startsWith('file://') && !/^[a-zA-Z]:[\\/]/.test(shortcut.url)) {
                 try {
                     let parsedUrl = shortcut.url;
@@ -423,7 +423,7 @@ const Main = {
                     }
                     const urlObj = new URL(parsedUrl);
                     shortcut.icon = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=128`;
-                } catch(e) {}
+                } catch (e) { }
             }
 
             if (!shortcut.title || !shortcut.url) return;
@@ -497,13 +497,13 @@ const Main = {
     addEventListeners() {
         const homeBtn = document.getElementById('home-btn');
         if (homeBtn) homeBtn.onclick = () => this.showDashboard();
-        
+
         const welcomeAddBtn = document.getElementById('welcome-add-btn');
         if (welcomeAddBtn) welcomeAddBtn.onclick = () => this.addNew();
-        
+
         const welcomeExportShortcutsBtn = document.getElementById('welcome-export-shortcuts-btn');
         if (welcomeExportShortcutsBtn) welcomeExportShortcutsBtn.onclick = () => this.exportShortcuts();
-        
+
         const welcomeImportShortcutsBtn = document.getElementById('welcome-import-shortcuts-btn');
         if (welcomeImportShortcutsBtn) welcomeImportShortcutsBtn.onclick = () => this.importShortcuts();
 
@@ -621,13 +621,13 @@ const Main = {
     },
 
     async exportAll() {
-      try {
-        const md = await API.exportAllMarkdown();
-        this.downloadFile('notebook_export.md', md);
-      } catch (err) {
-        console.error('Export All failed:', err);
-        Modals.showInfo(I18n.get('error_title'), I18n.get('export_all_error'));
-      }
+        try {
+            const md = await API.exportAllMarkdown();
+            this.downloadFile('notebook_export.md', md);
+        } catch (err) {
+            console.error('Export All failed:', err);
+            Modals.showInfo(I18n.get('error_title'), I18n.get('export_all_error'));
+        }
     },
 
     async refreshStats() {
@@ -716,176 +716,176 @@ const Main = {
     },
 
     async backupDb() {
-      try {
-        const data = await API.backupData();
-        const json = JSON.stringify(data, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-  
-        if ('showSaveFilePicker' in window) {
-          try {
-            const handle = await window.showSaveFilePicker({
-              suggestedName: 'notebook.backup.json',
-              types: [{
-                description: 'Notebook Backup',
-                accept: { 'application/json': ['.json'] }
-              }]
-            });
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-          } catch (err) {
-            if (err.name !== 'AbortError') {
-              console.error('Backup failed:', err);
-              // Fallback: download via blob URL
-              this.downloadFile('notebook.backup.json', json);
+        try {
+            const data = await API.backupData();
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'notebook.backup.json',
+                        types: [{
+                            description: 'Notebook Backup',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Backup failed:', err);
+                        // Fallback: download via blob URL
+                        this.downloadFile('notebook.backup.json', json);
+                    }
+                }
+            } else {
+                this.downloadFile('notebook.backup.json', json);
             }
-          }
-        } else {
-          this.downloadFile('notebook.backup.json', json);
+        } catch (err) {
+            console.error('Backup failed:', err);
+            Modals.showInfo(I18n.get('error_title'), err.message || 'Backup failed');
         }
-      } catch (err) {
-        console.error('Backup failed:', err);
-        Modals.showInfo(I18n.get('error_title'), err.message || 'Backup failed');
-      }
     },
-  
+
     async importDb() {
-      Modals.showConfirm(
-        I18n.get('confirm_import_title'),
-        I18n.get('confirm_import_text'),
-        async () => {
-          try {
+        Modals.showConfirm(
+            I18n.get('confirm_import_title'),
+            I18n.get('confirm_import_text'),
+            async () => {
+                try {
+                    let file;
+                    if ('showOpenFilePicker' in window) {
+                        const [handle] = await window.showOpenFilePicker({
+                            types: [{
+                                description: 'Notebook Backup',
+                                accept: { 'application/json': ['.json'] }
+                            }],
+                            multiple: false
+                        });
+                        file = await handle.getFile();
+                    } else {
+                        // Fallback for browsers without showOpenFilePicker
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.json';
+                        file = await new Promise((resolve) => {
+                            input.onchange = () => resolve(input.files[0]);
+                            input.click();
+                        });
+                    }
+
+                    if (!file) return;
+
+                    // Read and parse JSON file
+                    const text = await file.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (e) {
+                        alert('Import failed: invalid JSON file');
+                        return;
+                    }
+
+                    // Import data into chrome.storage
+                    await API.importData(data);
+
+                    // Reload the UI
+                    await Tree.refresh();
+                    Editor.clear();
+                    Main.refreshStats();
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Import failed:', err);
+                        alert('Import failed: ' + err.message);
+                    }
+                }
+            },
+            'danger'
+        );
+    },
+
+    async exportShortcuts() {
+        try {
+            const data = await API.backupShortcuts();
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+
+            if ('showSaveFilePicker' in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: 'notebook.home.json',
+                        types: [{
+                            description: 'Shortcuts Backup',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Backup failed:', err);
+                        this.downloadFile('notebook.home.json', json);
+                    }
+                }
+            } else {
+                this.downloadFile('notebook.home.json', json);
+            }
+        } catch (err) {
+            console.error('Backup failed:', err);
+            Modals.showInfo(I18n.get('error_title'), err.message || 'Export failed');
+        }
+    },
+
+    async importShortcuts() {
+        try {
             let file;
             if ('showOpenFilePicker' in window) {
-              const [handle] = await window.showOpenFilePicker({
-                types: [{
-                  description: 'Notebook Backup',
-                  accept: { 'application/json': ['.json'] }
-                }],
-                multiple: false
-              });
-              file = await handle.getFile();
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{
+                        description: 'Shortcuts Backup',
+                        accept: { 'application/json': ['.json'] }
+                    }],
+                    multiple: false
+                });
+                file = await handle.getFile();
             } else {
-              // Fallback for browsers without showOpenFilePicker
-              const input = document.createElement('input');
-              input.type = 'file';
-              input.accept = '.json';
-              file = await new Promise((resolve) => {
-                input.onchange = () => resolve(input.files[0]);
-                input.click();
-              });
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                file = await new Promise((resolve) => {
+                    input.onchange = () => resolve(input.files[0]);
+                    input.click();
+                });
             }
-  
+
             if (!file) return;
-  
-            // Read and parse JSON file
+
             const text = await file.text();
             let data;
             try {
-              data = JSON.parse(text);
+                data = JSON.parse(text);
             } catch (e) {
-              alert('Import failed: invalid JSON file');
-              return;
+                alert('Import failed: invalid JSON file');
+                return;
             }
-  
-            // Import data into chrome.storage
-            await API.importData(data);
-  
-            // Reload the UI
-            await Tree.refresh();
-            Editor.clear();
-            Main.refreshStats();
-          } catch (err) {
+
+            if (data.type !== 'shortcuts') {
+                alert('Import failed: Not a valid shortcuts file.');
+                return;
+            }
+
+            await API.importShortcuts(data);
+            await this.loadShortcuts();
+            Modals.showInfo(I18n.get('notice_title') || 'Notice', 'Shortcuts imported successfully');
+        } catch (err) {
             if (err.name !== 'AbortError') {
-              console.error('Import failed:', err);
-              alert('Import failed: ' + err.message);
+                console.error('Import failed:', err);
+                alert('Import failed: ' + err.message);
             }
-          }
-        },
-        'danger'
-      );
-    },
-  
-    async exportShortcuts() {
-      try {
-        const data = await API.backupShortcuts();
-        const json = JSON.stringify(data, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-  
-        if ('showSaveFilePicker' in window) {
-          try {
-            const handle = await window.showSaveFilePicker({
-              suggestedName: 'notebook.home.json',
-              types: [{
-                description: 'Shortcuts Backup',
-                accept: { 'application/json': ['.json'] }
-              }]
-            });
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-          } catch (err) {
-            if (err.name !== 'AbortError') {
-              console.error('Backup failed:', err);
-              this.downloadFile('notebook.home.json', json);
-            }
-          }
-        } else {
-          this.downloadFile('notebook.home.json', json);
         }
-      } catch (err) {
-        console.error('Backup failed:', err);
-        Modals.showInfo(I18n.get('error_title'), err.message || 'Export failed');
-      }
-    },
-  
-    async importShortcuts() {
-      try {
-        let file;
-        if ('showOpenFilePicker' in window) {
-          const [handle] = await window.showOpenFilePicker({
-            types: [{
-              description: 'Shortcuts Backup',
-              accept: { 'application/json': ['.json'] }
-            }],
-            multiple: false
-          });
-          file = await handle.getFile();
-        } else {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.json';
-          file = await new Promise((resolve) => {
-            input.onchange = () => resolve(input.files[0]);
-            input.click();
-          });
-        }
-  
-        if (!file) return;
-  
-        const text = await file.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          alert('Import failed: invalid JSON file');
-          return;
-        }
-  
-        if (data.type !== 'shortcuts') {
-          alert('Import failed: Not a valid shortcuts file.');
-          return;
-        }
-  
-        await API.importShortcuts(data);
-        await this.loadShortcuts();
-        Modals.showInfo(I18n.get('notice_title') || 'Notice', 'Shortcuts imported successfully');
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error('Import failed:', err);
-          alert('Import failed: ' + err.message);
-        }
-      }
     }
 };
 
