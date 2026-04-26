@@ -728,12 +728,13 @@ pre code {
 }
 
 .shortcut-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 15px;
+    position: relative;
+    min-height: 400px;
 }
 
 .shortcut-card {
+    position: absolute;
+    width: 140px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -748,7 +749,6 @@ pre code {
     cursor: pointer;
     min-height: 100px;
     text-align: center;
-    position: relative;
 }
 
 .shortcut-actions-overlay {

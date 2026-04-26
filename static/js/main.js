@@ -91,6 +91,27 @@ const Main = {
         this.showDashboard();
     },
 
+    findEmptySlot(shortcuts) {
+        const GRID_W = 160;
+        const GRID_H = 140;
+        const occupied = new Set();
+        for (const s of shortcuts) {
+            if (s.x !== undefined && s.y !== undefined) {
+                occupied.add(`${s.x},${s.y}`);
+            }
+        }
+        for (let y = 0; y < 20; y++) {
+            for (let x = 0; x < 10; x++) {
+                const px = x * GRID_W;
+                const py = y * GRID_H;
+                if (!occupied.has(`${px},${py}`)) {
+                    return { x: px, y: py };
+                }
+            }
+        }
+        return { x: 0, y: 0 };
+    },
+
     async loadShortcuts() {
         const shortcuts = await API.getShortcuts();
         const container = document.getElementById('shortcuts-container');
@@ -98,12 +119,25 @@ const Main = {
 
         container.innerHTML = '';
 
-        let draggedIndex = -1;
+        const GRID_W = 160;
+        const GRID_H = 140;
+
+        let needsSave = false;
 
         shortcuts.forEach((s, index) => {
             const card = document.createElement('div');
             card.className = 'shortcut-card';
             card.draggable = true;
+
+            if (s.x === undefined || s.y === undefined) {
+                const slot = this.findEmptySlot(shortcuts);
+                s.x = slot.x;
+                s.y = slot.y;
+                needsSave = true;
+            }
+
+            card.style.left = s.x + 'px';
+            card.style.top = s.y + 'px';
 
             let targetUrl = s.url.trim();
             // Remove wrapping quotes if the user pasted them
@@ -136,39 +170,23 @@ const Main = {
             `;
 
             card.addEventListener('dragstart', (e) => {
-                draggedIndex = index;
+                this.draggedShortcutIndex = index;
                 e.dataTransfer.effectAllowed = 'move';
+                
+                const rect = card.getBoundingClientRect();
+                this.dragOffsetX = e.clientX - rect.left;
+                this.dragOffsetY = e.clientY - rect.top;
+                
+                if (e.dataTransfer.setData) {
+                    e.dataTransfer.setData('text/plain', '');
+                }
+
                 setTimeout(() => card.style.opacity = '0.5', 0);
             });
 
             card.addEventListener('dragend', () => {
                 card.style.opacity = '1';
                 document.querySelectorAll('.shortcut-card').forEach(c => c.style.transform = '');
-            });
-
-            card.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (draggedIndex === -1 || draggedIndex === index) return;
-                card.style.transform = 'scale(1.05)';
-                card.style.zIndex = '1';
-            });
-
-            card.addEventListener('dragleave', () => {
-                card.style.transform = '';
-                card.style.zIndex = '';
-            });
-
-            card.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                card.style.transform = '';
-                card.style.zIndex = '';
-                if (draggedIndex === -1 || draggedIndex === index) return;
-
-                const draggedItem = shortcuts.splice(draggedIndex, 1)[0];
-                shortcuts.splice(index, 0, draggedItem);
-                await API.saveShortcuts(shortcuts);
-                await this.loadShortcuts();
             });
 
             card.onclick = (e) => {
@@ -199,28 +217,55 @@ const Main = {
         addBtn.textContent = '+ Add';
         addBtn.onclick = () => this.addShortcut();
 
-        addBtn.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if (draggedIndex === -1) return;
-            addBtn.style.transform = 'scale(1.05)';
-        });
-
-        addBtn.addEventListener('dragleave', () => {
-            addBtn.style.transform = '';
-        });
-
-        addBtn.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            addBtn.style.transform = '';
-            if (draggedIndex === -1 || draggedIndex === shortcuts.length - 1) return;
-            const draggedItem = shortcuts.splice(draggedIndex, 1)[0];
-            shortcuts.push(draggedItem);
-            await API.saveShortcuts(shortcuts);
-            await this.loadShortcuts();
-        });
+        const addSlot = this.findEmptySlot(shortcuts);
+        addBtn.style.left = addSlot.x + 'px';
+        addBtn.style.top = addSlot.y + 'px';
 
         container.appendChild(addBtn);
+
+        container.ondragover = (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        };
+
+        container.ondrop = async (e) => {
+            e.preventDefault();
+            if (this.draggedShortcutIndex === undefined || this.draggedShortcutIndex === -1) return;
+
+            const containerRect = container.getBoundingClientRect();
+            let newX = e.clientX - containerRect.left + container.scrollLeft - (this.dragOffsetX || 0);
+            let newY = e.clientY - containerRect.top + container.scrollTop - (this.dragOffsetY || 0);
+
+            newX = Math.round(newX / GRID_W) * GRID_W;
+            newY = Math.round(newY / GRID_H) * GRID_H;
+
+            newX = Math.max(0, newX);
+            newY = Math.max(0, newY);
+
+            const currentShortcuts = await API.getShortcuts();
+            
+            const targetIndex = currentShortcuts.findIndex(s => s.x === newX && s.y === newY);
+            if (targetIndex !== -1 && targetIndex !== this.draggedShortcutIndex) {
+                const tempX = currentShortcuts[this.draggedShortcutIndex].x;
+                const tempY = currentShortcuts[this.draggedShortcutIndex].y;
+                currentShortcuts[this.draggedShortcutIndex].x = newX;
+                currentShortcuts[this.draggedShortcutIndex].y = newY;
+                currentShortcuts[targetIndex].x = tempX;
+                currentShortcuts[targetIndex].y = tempY;
+            } else {
+                currentShortcuts[this.draggedShortcutIndex].x = newX;
+                currentShortcuts[this.draggedShortcutIndex].y = newY;
+            }
+
+            this.draggedShortcutIndex = -1;
+
+            await API.saveShortcuts(currentShortcuts);
+            await this.loadShortcuts();
+        };
+
+        if (needsSave) {
+            await API.saveShortcuts(shortcuts);
+        }
     },
 
     getIconSelectionHTML(selectedIcon = '🌐') {
