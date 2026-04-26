@@ -58,23 +58,18 @@
         </aside>
         <div id="resizer" class="resizer"></div>
         <main class="main-content">
-            <div id="welcome-view" class="welcome-dashboard">
+            <div id="welcome-view" class="welcome-dashboard" style="position: relative;">
+                <div class="welcome-top-left" style="position: absolute; top: 20px; left: 20px; display: flex; gap: 10px;">
+                    <button id="welcome-export-shortcuts-btn" class="btn backup">📤 Export start page</button>
+                    <button id="welcome-import-shortcuts-btn" class="btn import">📥 Import start page</button>
+                </div>
                 <h1 class="welcome-title" data-i18n="welcome_title">Welcome to Notebook</h1>
                 
-                <div class="dashboard-grid">
+                <div class="dashboard-grid" style="grid-template-columns: 1fr; max-width: 800px;">
                     <div class="dashboard-section">
                         <h2 data-i18n="shortcuts_title">Shortcuts</h2>
                         <div id="shortcuts-container" class="shortcut-cards">
                             <!-- Shortcuts rendered here -->
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-section">
-                        <h2 data-i18n="quick_actions_title">Quick Actions</h2>
-                        <div class="action-buttons">
-                            <button id="welcome-add-btn" class="btn primary big" data-i18n="welcome_new_note">📝 New Note</button>
-                            <button id="welcome-export-shortcuts-btn" class="btn backup big">📤 Export start page</button>
-                            <button id="welcome-import-shortcuts-btn" class="btn import big">📥 Import start page</button>
                         </div>
                     </div>
                 </div>

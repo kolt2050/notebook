@@ -98,12 +98,49 @@ const Main = {
 
         container.innerHTML = '';
         shortcuts.forEach(s => {
-            const a = document.createElement('a');
-            a.href = s.url;
-            a.target = '_blank';
-            a.className = 'shortcut-card';
-            a.innerHTML = `<div class="shortcut-icon">${s.icon || '🔗'}</div><div class="shortcut-title">${s.title}</div>`;
-            container.appendChild(a);
+            const card = document.createElement('div');
+            card.className = 'shortcut-card';
+
+            let targetUrl = s.url.trim();
+            // Remove wrapping quotes if the user pasted them
+            if ((targetUrl.startsWith('"') && targetUrl.endsWith('"')) || (targetUrl.startsWith("'") && targetUrl.endsWith("'"))) {
+                targetUrl = targetUrl.slice(1, -1);
+            }
+
+            if (/^[a-zA-Z]:[\\/]/.test(targetUrl)) {
+                targetUrl = 'file:///' + targetUrl.replace(/\\/g, '/');
+            }
+
+            card.innerHTML = `
+                <div class="shortcut-actions-overlay">
+                    <button class="shortcut-action-btn edit-btn" title="Edit">✏️</button>
+                    <button class="shortcut-action-btn delete-btn" title="Delete">🗑️</button>
+                </div>
+                <div class="shortcut-icon">${s.icon || '🔗'}</div>
+                <div class="shortcut-title">${s.title}</div>
+            `;
+            
+            card.onclick = (e) => {
+                if (e.target.closest('.shortcut-actions-overlay')) return;
+                
+                if (targetUrl.startsWith('file:///')) {
+                    if (chrome && chrome.tabs && chrome.tabs.create) {
+                        chrome.tabs.create({ url: targetUrl });
+                    } else {
+                        window.open(targetUrl, '_blank');
+                    }
+                } else {
+                    window.open(targetUrl, '_blank');
+                }
+            };
+
+            const editBtn = card.querySelector('.edit-btn');
+            editBtn.onclick = (e) => { e.stopPropagation(); this.editShortcut(s.id); };
+            
+            const deleteBtn = card.querySelector('.delete-btn');
+            deleteBtn.onclick = (e) => { e.stopPropagation(); this.deleteShortcut(s.id); };
+
+            container.appendChild(card);
         });
 
         const addBtn = document.createElement('div');
@@ -114,16 +151,57 @@ const Main = {
     },
 
     async addShortcut() {
-        const title = prompt(I18n.get('shortcut_title_prompt') || 'Shortcut Name:');
-        if (!title) return;
-        const url = prompt(I18n.get('shortcut_url_prompt') || 'URL (starts with http/https):');
-        if (!url) return;
-        const icon = prompt(I18n.get('shortcut_icon_prompt') || 'Icon (emoji or text):', '🌐') || '🌐';
+        const bodyHtml = `
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="shortcut-title" placeholder="Name">
+                <input type="text" id="shortcut-url" placeholder="URL (http/https or C:/...)">
+                <input type="text" id="shortcut-icon" placeholder="Icon (e.g. 🌐)" value="🌐">
+            </div>
+        `;
+        Modals.show('Add Shortcut', bodyHtml, async () => {
+            const title = document.getElementById('shortcut-title').value.trim();
+            const url = document.getElementById('shortcut-url').value.trim();
+            const icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
+            
+            if (!title || !url) return;
 
+            const shortcuts = await API.getShortcuts();
+            shortcuts.push({ id: Date.now().toString(), title, url, icon });
+            await API.saveShortcuts(shortcuts);
+            await this.loadShortcuts();
+        });
+    },
+
+    async editShortcut(id) {
         const shortcuts = await API.getShortcuts();
-        shortcuts.push({ id: Date.now().toString(), title, url, icon });
-        await API.saveShortcuts(shortcuts);
-        await this.loadShortcuts();
+        const shortcut = shortcuts.find(s => s.id === id);
+        if (!shortcut) return;
+
+        const bodyHtml = `
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="shortcut-title" value="${shortcut.title.replace(/"/g, '&quot;')}">
+                <input type="text" id="shortcut-url" value="${shortcut.url.replace(/"/g, '&quot;')}">
+                <input type="text" id="shortcut-icon" value="${shortcut.icon.replace(/"/g, '&quot;')}">
+            </div>
+        `;
+        Modals.show('Edit Shortcut', bodyHtml, async () => {
+            shortcut.title = document.getElementById('shortcut-title').value.trim();
+            shortcut.url = document.getElementById('shortcut-url').value.trim();
+            shortcut.icon = document.getElementById('shortcut-icon').value.trim() || '🌐';
+            
+            if (!shortcut.title || !shortcut.url) return;
+            await API.saveShortcuts(shortcuts);
+            await this.loadShortcuts();
+        });
+    },
+
+    async deleteShortcut(id) {
+        Modals.showConfirm('Delete Shortcut', 'Are you sure you want to delete this shortcut?', async () => {
+            let shortcuts = await API.getShortcuts();
+            shortcuts = shortcuts.filter(s => s.id !== id);
+            await API.saveShortcuts(shortcuts);
+            await this.loadShortcuts();
+        }, 'danger');
     },
 
     showDashboard() {

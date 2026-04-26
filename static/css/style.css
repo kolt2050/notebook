@@ -701,6 +701,34 @@ pre code {
     cursor: pointer;
     min-height: 100px;
     text-align: center;
+    position: relative;
+}
+
+.shortcut-actions-overlay {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: none;
+    gap: 5px;
+}
+
+.shortcut-card:hover .shortcut-actions-overlay {
+    display: flex;
+}
+
+.shortcut-action-btn {
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 2px;
+    opacity: 0.8;
+}
+
+.shortcut-action-btn:hover {
+    opacity: 1;
+    background: var(--border-color);
 }
 
 .shortcut-card:hover {

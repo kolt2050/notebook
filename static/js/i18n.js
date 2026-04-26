@@ -2,6 +2,8 @@ const I18n = {
     current: localStorage.getItem('lang') || 'EN',
     strings: {
         EN: {
+          welcome_title: "Notebook",
+          shortcuts_title: "My links",
           app_title: "Notebook",
           add_doc: "Add Document",
           backup_db: "Backup JSON",
@@ -37,6 +39,8 @@ const I18n = {
             ctrl_click_hint: "Ctrl + Click to follow link"
         },
         RU: {
+          welcome_title: "Блокнот",
+          shortcuts_title: "Мои ссылки",
           app_title: "Блокнот",
           add_doc: "Добавить документ",
           backup_db: "Бэкап JSON",
