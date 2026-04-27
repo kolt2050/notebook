@@ -785,8 +785,26 @@ const Main = {
 
     async deleteDeadlineItem(id) {
         const items = await this.getCurrentDeadlineItems();
-        await this.saveCurrentDeadlineItems(items.filter(item => item.id !== id));
-        await this.loadDeadlines();
+        const item = items.find(item => item.id === id);
+        const title = item && item.text ? item.text : 'this deadline';
+        const safeTitle = title.replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[char]);
+
+        Modals.showConfirm(
+            'Delete deadline',
+            `Are you sure you want to delete "${safeTitle}"?`,
+            async () => {
+                const currentItems = await this.getCurrentDeadlineItems();
+                await this.saveCurrentDeadlineItems(currentItems.filter(item => item.id !== id));
+                await this.loadDeadlines();
+            },
+            'danger'
+        );
     },
 
     startDeadlineTimer() {
