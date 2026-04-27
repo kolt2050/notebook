@@ -822,7 +822,7 @@ pre code {
 
 .deadline-item {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(220px, 360px) 36px;
+    grid-template-columns: minmax(100px, 150px) minmax(180px, 1fr) minmax(220px, 360px) 36px;
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
@@ -831,10 +831,12 @@ pre code {
     border-radius: 8px;
 }
 
+.deadline-type-wrap,
 .deadline-text-wrap {
     min-width: 0;
 }
 
+.deadline-type,
 .deadline-text {
     width: 100%;
     background: transparent;
@@ -850,11 +852,18 @@ pre code {
     white-space: nowrap;
 }
 
+.deadline-type {
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.deadline-type:hover,
 .deadline-text:hover {
     border-color: rgba(88, 166, 255, 0.25);
     border-radius: 6px;
 }
 
+.deadline-type-input,
 .deadline-text-input,
 .deadline-date-input {
     width: 100%;
@@ -978,9 +987,24 @@ pre code {
         grid-template-columns: 1fr 36px;
     }
 
-    .deadline-bar-container {
+    .deadline-type-wrap {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .deadline-text-wrap {
         grid-column: 1 / -1;
         grid-row: 2;
+    }
+
+    .deadline-bar-container {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
+    .deadline-delete-btn {
+        grid-column: 2;
+        grid-row: 1;
     }
 }
 

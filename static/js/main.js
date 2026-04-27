@@ -2,6 +2,7 @@ const Main = {
     currentTabIndex: 0,
     deadlineTimer: null,
     editingDeadlineId: null,
+    editingDeadlineField: null,
     async init() {
         try {
             if (typeof TurndownService !== 'undefined') {
@@ -561,10 +562,57 @@ const Main = {
             row.className = 'deadline-item';
             row.dataset.deadlineId = item.id;
 
+            const typeWrap = document.createElement('div');
+            typeWrap.className = 'deadline-type-wrap';
+
+            if (this.editingDeadlineId === item.id && this.editingDeadlineField === 'type') {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'deadline-type-input';
+                input.value = item.type || '';
+                input.placeholder = 'Тип';
+
+                let isSavingType = false;
+                const finishEdit = async () => {
+                    if (isSavingType) return;
+                    isSavingType = true;
+                    const nextItems = await this.getCurrentDeadlineItems();
+                    const target = nextItems.find(d => d.id === item.id);
+                    if (target) target.type = input.value.trim();
+                    this.editingDeadlineId = null;
+                    this.editingDeadlineField = null;
+                    await this.saveCurrentDeadlineItems(nextItems);
+                    await this.loadDeadlines();
+                };
+
+                input.onblur = finishEdit;
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') finishEdit();
+                    if (e.key === 'Escape') {
+                        isSavingType = true;
+                        this.editingDeadlineId = null;
+                        this.editingDeadlineField = null;
+                        this.loadDeadlines();
+                    }
+                };
+                typeWrap.appendChild(input);
+                setTimeout(() => {
+                    input.focus();
+                    input.select();
+                }, 0);
+            } else {
+                const type = document.createElement('button');
+                type.type = 'button';
+                type.className = 'deadline-type';
+                type.textContent = item.type || 'Тип';
+                type.onclick = () => this.editDeadlineType(item.id);
+                typeWrap.appendChild(type);
+            }
+
             const textWrap = document.createElement('div');
             textWrap.className = 'deadline-text-wrap';
 
-            if (this.editingDeadlineId === item.id) {
+            if (this.editingDeadlineId === item.id && this.editingDeadlineField === 'text') {
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.className = 'deadline-text-input';
@@ -579,6 +627,7 @@ const Main = {
                     const target = nextItems.find(d => d.id === item.id);
                     if (target) target.text = input.value.trim();
                     this.editingDeadlineId = null;
+                    this.editingDeadlineField = null;
                     await this.saveCurrentDeadlineItems(nextItems);
                     await this.loadDeadlines();
                 };
@@ -589,6 +638,7 @@ const Main = {
                     if (e.key === 'Escape') {
                         isSavingText = true;
                         this.editingDeadlineId = null;
+                        this.editingDeadlineField = null;
                         this.loadDeadlines();
                     }
                 };
@@ -638,6 +688,7 @@ const Main = {
             deleteBtn.textContent = '🗑️';
             deleteBtn.onclick = () => this.deleteDeadlineItem(item.id);
 
+            row.appendChild(typeWrap);
             row.appendChild(textWrap);
             row.appendChild(barContainer);
             row.appendChild(deleteBtn);
@@ -660,6 +711,7 @@ const Main = {
 
         const item = {
             id: 'dl_' + Date.now(),
+            type: '',
             text: '',
             deadline: tomorrow.toISOString()
         };
@@ -667,12 +719,20 @@ const Main = {
         const items = await this.getCurrentDeadlineItems();
         items.push(item);
         this.editingDeadlineId = item.id;
+        this.editingDeadlineField = 'type';
         await this.saveCurrentDeadlineItems(items);
         await this.loadDeadlines();
     },
 
+    editDeadlineType(id) {
+        this.editingDeadlineId = id;
+        this.editingDeadlineField = 'type';
+        this.loadDeadlines();
+    },
+
     editDeadlineText(id) {
         this.editingDeadlineId = id;
+        this.editingDeadlineField = 'text';
         this.loadDeadlines();
     },
 
