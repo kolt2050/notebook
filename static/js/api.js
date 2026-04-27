@@ -71,6 +71,49 @@ function _getPlainText(html) {
 }
 
 const API = {
+  normalizeShortcutPages(pages) {
+    let changed = false;
+    if (!Array.isArray(pages) || pages.length === 0) {
+      return {
+        pages: [{ id: 'page_1', title: 'Лист 1', type: 'shortcut', shortcuts: [] }],
+        changed: true
+      };
+    }
+
+    const normalized = pages.map((page, index) => {
+      const nextPage = { ...page };
+      if (!nextPage.id) {
+        nextPage.id = 'page_' + Date.now() + '_' + index;
+        changed = true;
+      }
+      if (!nextPage.title) {
+        nextPage.title = `Лист ${index + 1}`;
+        changed = true;
+      }
+      if (!nextPage.type) {
+        nextPage.type = 'shortcut';
+        changed = true;
+      }
+
+      if (nextPage.type === 'deadline') {
+        if (!Array.isArray(nextPage.items)) {
+          nextPage.items = [];
+          changed = true;
+        }
+      } else {
+        nextPage.type = 'shortcut';
+        if (!Array.isArray(nextPage.shortcuts)) {
+          nextPage.shortcuts = [];
+          changed = true;
+        }
+      }
+
+      return nextPage;
+    });
+
+    return { pages: normalized, changed };
+  },
+
   async getTree() {
     const docs = await _getAllDocs();
     // Sort by position, then id
@@ -258,11 +301,17 @@ const API = {
       ];
       await _set({ 'notebook_shortcut_pages': pages });
     }
+    const normalized = this.normalizeShortcutPages(pages);
+    pages = normalized.pages;
+    if (normalized.changed) {
+      await _set({ 'notebook_shortcut_pages': pages });
+    }
     return pages;
   },
 
   async saveShortcutPages(pages) {
-    await _set({ 'notebook_shortcut_pages': pages });
+    const normalized = this.normalizeShortcutPages(pages);
+    await _set({ 'notebook_shortcut_pages': normalized.pages });
   },
 
   async getShortcuts() {

@@ -1,5 +1,7 @@
 const Main = {
     currentTabIndex: 0,
+    deadlineTimer: null,
+    editingDeadlineId: null,
     async init() {
         try {
             if (typeof TurndownService !== 'undefined') {
@@ -93,18 +95,37 @@ const Main = {
         this.showDashboard();
     },
 
-    async getCurrentShortcuts() {
+    async getCurrentPage() {
         const pages = await API.getShortcutPages();
         if (this.currentTabIndex >= pages.length) this.currentTabIndex = Math.max(0, pages.length - 1);
-        if (!pages[this.currentTabIndex].shortcuts) pages[this.currentTabIndex].shortcuts = [];
-        return pages[this.currentTabIndex].shortcuts;
+        return pages[this.currentTabIndex];
+    },
+
+    async saveCurrentPage(pagePatch) {
+        const pages = await API.getShortcutPages();
+        if (this.currentTabIndex >= pages.length) this.currentTabIndex = Math.max(0, pages.length - 1);
+        pages[this.currentTabIndex] = { ...pages[this.currentTabIndex], ...pagePatch };
+        await API.saveShortcutPages(pages);
+    },
+
+    async getCurrentShortcuts() {
+        const page = await this.getCurrentPage();
+        if (!page.shortcuts) page.shortcuts = [];
+        return page.shortcuts;
     },
 
     async saveCurrentShortcuts(shortcuts) {
-        const pages = await API.getShortcutPages();
-        if (this.currentTabIndex >= pages.length) this.currentTabIndex = Math.max(0, pages.length - 1);
-        pages[this.currentTabIndex].shortcuts = shortcuts;
-        await API.saveShortcutPages(pages);
+        await this.saveCurrentPage({ type: 'shortcut', shortcuts });
+    },
+
+    async getCurrentDeadlineItems() {
+        const page = await this.getCurrentPage();
+        if (!page.items) page.items = [];
+        return page.items;
+    },
+
+    async saveCurrentDeadlineItems(items) {
+        await this.saveCurrentPage({ type: 'deadline', items: this.sortDeadlinesByDate(items) });
     },
 
     async loadShortcutTabs() {
@@ -130,7 +151,13 @@ const Main = {
                 this.loadShortcuts();
             };
             
+            const typeIcon = document.createElement('span');
+            typeIcon.className = 'tab-type-icon';
+            typeIcon.textContent = page.type === 'deadline' ? '⏰' : '🔗';
+            tab.appendChild(typeIcon);
+
             const titleSpan = document.createElement('span');
+            titleSpan.className = 'tab-title';
             titleSpan.textContent = page.title || `Лист ${index + 1}`;
             tab.appendChild(titleSpan);
             
@@ -150,9 +177,70 @@ const Main = {
     },
 
     async addShortcutTab() {
+        const existingMenu = document.querySelector('.tab-create-menu');
+        if (existingMenu) {
+            existingMenu.remove();
+            return;
+        }
+
+        const addBtn = document.getElementById('add-shortcut-tab-btn');
+        if (!addBtn) return;
+
+        const menu = document.createElement('div');
+        menu.className = 'tab-context-menu tab-create-menu';
+        menu.innerHTML = `
+            <div class="tab-context-menu-item" data-tab-type="shortcut">
+                <span class="tab-create-menu-icon">Link</span>
+                <span>Links</span>
+            </div>
+            <div class="tab-context-menu-item" data-tab-type="deadline">
+                <span class="tab-create-menu-icon">Due</span>
+                <span>Deadlines</span>
+            </div>
+        `;
+
+        const rect = addBtn.getBoundingClientRect();
+        menu.style.top = `${rect.bottom + 6}px`;
+        menu.style.left = `${Math.max(8, rect.right - 170)}px`;
+        document.body.appendChild(menu);
+
+        const closeMenu = () => {
+            menu.remove();
+            document.removeEventListener('click', onOutsideClick);
+            document.removeEventListener('keydown', onKeydown);
+        };
+
+        const onOutsideClick = (e) => {
+            if (!menu.contains(e.target) && e.target !== addBtn) closeMenu();
+        };
+
+        const onKeydown = (e) => {
+            if (e.key === 'Escape') closeMenu();
+        };
+
+        menu.querySelectorAll('[data-tab-type]').forEach(item => {
+            item.onclick = async () => {
+                const type = item.dataset.tabType;
+                closeMenu();
+                await this.createShortcutTab(type);
+            };
+        });
+
+        setTimeout(() => {
+            document.addEventListener('click', onOutsideClick);
+            document.addEventListener('keydown', onKeydown);
+        }, 0);
+    },
+
+    async createShortcutTab(type = 'shortcut') {
         const pages = await API.getShortcutPages();
         const newId = 'page_' + Date.now();
-        pages.push({ id: newId, title: `Лист ${pages.length + 1}`, shortcuts: [] });
+        const pageNumber = pages.length + 1;
+        const newPage = type === 'deadline'
+            ? { id: newId, title: `Deadlines ${pageNumber}`, type: 'deadline', items: [] }
+            : { id: newId, title: `Лист ${pageNumber}`, type: 'shortcut', shortcuts: [] };
+
+        pages.push(newPage);
         await API.saveShortcutPages(pages);
         this.currentTabIndex = pages.length - 1;
         await this.loadShortcutTabs();
@@ -160,7 +248,7 @@ const Main = {
     },
 
     async deleteShortcutTab(index) {
-        Modals.showConfirm('Delete Tab', 'Are you sure you want to delete this tab and all its shortcuts?', async () => {
+        Modals.showConfirm('Delete Tab', 'Are you sure you want to delete this tab and all its content?', async () => {
             const pages = await API.getShortcutPages();
             if (pages.length <= 1) return;
             pages.splice(index, 1);
@@ -176,7 +264,7 @@ const Main = {
     async renameShortcutTab(index) {
         const tabsContainer = document.getElementById('shortcut-tabs');
         const tabEl = tabsContainer.children[index];
-        const titleSpan = tabEl.querySelector('span:not(.tab-close)');
+        const titleSpan = tabEl.querySelector('.tab-title');
         const currentTitle = titleSpan.textContent;
         
         const input = document.createElement('input');
@@ -228,11 +316,23 @@ const Main = {
     },
 
     async loadShortcuts() {
+        const page = await this.getCurrentPage();
+        if (page && page.type === 'deadline') {
+            return this.loadDeadlines();
+        }
+
+        this.stopDeadlineTimer();
         const shortcuts = await this.getCurrentShortcuts();
+        return this.loadShortcutGrid(shortcuts);
+    },
+
+    async loadShortcutGrid(shortcuts) {
         const container = document.getElementById('shortcuts-container');
         if (!container) return;
 
         container.innerHTML = '';
+        container.classList.remove('deadline-list');
+        container.classList.add('shortcut-cards');
 
         const GRID_W = 160;
         const GRID_H = 140;
@@ -380,6 +480,271 @@ const Main = {
 
         if (needsSave) {
             await this.saveCurrentShortcuts(shortcuts);
+        }
+    },
+
+    sortDeadlinesByDate(items) {
+        return [...items].sort((a, b) => {
+            const aTime = new Date(a.deadline).getTime();
+            const bTime = new Date(b.deadline).getTime();
+            const safeA = Number.isNaN(aTime) ? Infinity : aTime;
+            const safeB = Number.isNaN(bTime) ? Infinity : bTime;
+            return safeA - safeB;
+        });
+    },
+
+    formatTimeRemaining(deadlineDate) {
+        const deadline = new Date(deadlineDate);
+        const time = deadline.getTime();
+        if (Number.isNaN(time)) return 'No date';
+
+        const diff = time - Date.now();
+        if (diff < 0) return 'Просрочено';
+        if (diff < 24 * 60 * 60 * 1000) return 'Сегодня';
+
+        const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
+        return `${days} дн.`;
+    },
+
+    getDeadlineProgress(deadlineDate) {
+        const deadline = new Date(deadlineDate);
+        const time = deadline.getTime();
+        if (Number.isNaN(time)) return 100;
+
+        const diff = time - Date.now();
+        if (diff < 0) return 100;
+
+        const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
+        return Math.max(8, Math.min(100, (days / 30) * 100));
+    },
+
+    getDeadlineState(deadlineDate) {
+        const time = new Date(deadlineDate).getTime();
+        if (Number.isNaN(time)) return { color: 'red', overdue: false };
+
+        const diff = time - Date.now();
+        const twoDays = 2 * 24 * 60 * 60 * 1000;
+        return {
+            color: diff > twoDays ? 'green' : 'red',
+            overdue: diff < 0
+        };
+    },
+
+    toDateTimeLocalValue(dateString) {
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return '';
+        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return localDate.toISOString().slice(0, 16);
+    },
+
+    async loadDeadlines() {
+        const container = document.getElementById('shortcuts-container');
+        if (!container) return;
+
+        let items = this.sortDeadlinesByDate(await this.getCurrentDeadlineItems());
+        container.innerHTML = '';
+        container.classList.remove('shortcut-cards');
+        container.classList.add('deadline-list');
+        container.ondragover = null;
+        container.ondrop = null;
+        this.draggedShortcutIndex = -1;
+
+        if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'deadline-empty';
+            empty.textContent = 'No deadlines yet';
+            container.appendChild(empty);
+        }
+
+        items.forEach((item) => {
+            const row = document.createElement('div');
+            row.className = 'deadline-item';
+            row.dataset.deadlineId = item.id;
+
+            const textWrap = document.createElement('div');
+            textWrap.className = 'deadline-text-wrap';
+
+            if (this.editingDeadlineId === item.id) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'deadline-text-input';
+                input.value = item.text || '';
+                input.placeholder = 'Описание задачи';
+
+                let isSavingText = false;
+                const finishEdit = async () => {
+                    if (isSavingText) return;
+                    isSavingText = true;
+                    const nextItems = await this.getCurrentDeadlineItems();
+                    const target = nextItems.find(d => d.id === item.id);
+                    if (target) target.text = input.value.trim();
+                    this.editingDeadlineId = null;
+                    await this.saveCurrentDeadlineItems(nextItems);
+                    await this.loadDeadlines();
+                };
+
+                input.onblur = finishEdit;
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') finishEdit();
+                    if (e.key === 'Escape') {
+                        isSavingText = true;
+                        this.editingDeadlineId = null;
+                        this.loadDeadlines();
+                    }
+                };
+                textWrap.appendChild(input);
+                setTimeout(() => {
+                    input.focus();
+                    input.select();
+                }, 0);
+            } else {
+                const text = document.createElement('button');
+                text.type = 'button';
+                text.className = 'deadline-text';
+                text.textContent = item.text || 'Без описания';
+                text.onclick = () => this.editDeadlineText(item.id);
+                textWrap.appendChild(text);
+            }
+
+            const barContainer = document.createElement('div');
+            barContainer.className = 'deadline-bar-container';
+            barContainer.tabIndex = 0;
+            barContainer.role = 'button';
+            barContainer.title = 'Change deadline';
+            barContainer.onclick = () => this.editDeadlineDate(item.id);
+            barContainer.onkeydown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.editDeadlineDate(item.id);
+                }
+            };
+
+            const state = this.getDeadlineState(item.deadline);
+            const bar = document.createElement('span');
+            bar.className = `deadline-bar ${state.color}${state.overdue ? ' overdue' : ''}`;
+            bar.style.width = `${this.getDeadlineProgress(item.deadline)}%`;
+
+            const label = document.createElement('span');
+            label.className = 'deadline-bar-label';
+            label.textContent = this.formatTimeRemaining(item.deadline);
+
+            barContainer.appendChild(bar);
+            barContainer.appendChild(label);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'deadline-delete-btn';
+            deleteBtn.title = 'Delete deadline';
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.onclick = () => this.deleteDeadlineItem(item.id);
+
+            row.appendChild(textWrap);
+            row.appendChild(barContainer);
+            row.appendChild(deleteBtn);
+            container.appendChild(row);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'deadline-add-btn';
+        addBtn.textContent = '+ Добавить дедлайн';
+        addBtn.onclick = () => this.addDeadlineItem();
+        container.appendChild(addBtn);
+
+        this.startDeadlineTimer();
+    },
+
+    async addDeadlineItem() {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const item = {
+            id: 'dl_' + Date.now(),
+            text: '',
+            deadline: tomorrow.toISOString()
+        };
+
+        const items = await this.getCurrentDeadlineItems();
+        items.push(item);
+        this.editingDeadlineId = item.id;
+        await this.saveCurrentDeadlineItems(items);
+        await this.loadDeadlines();
+    },
+
+    editDeadlineText(id) {
+        this.editingDeadlineId = id;
+        this.loadDeadlines();
+    },
+
+    async editDeadlineDate(id) {
+        const container = document.getElementById('shortcuts-container');
+        const items = await this.getCurrentDeadlineItems();
+        const item = items.find(d => d.id === id);
+        if (!container || !item) return;
+
+        const row = Array.from(container.querySelectorAll('.deadline-item')).find(el => el.dataset.deadlineId === id);
+        const targetBar = row ? row.querySelector('.deadline-bar-container') : null;
+
+        if (!targetBar) return;
+
+        targetBar.innerHTML = '';
+        targetBar.classList.add('editing');
+        const input = document.createElement('input');
+        input.type = 'datetime-local';
+        input.className = 'deadline-date-input';
+        input.value = this.toDateTimeLocalValue(item.deadline);
+        targetBar.appendChild(input);
+
+        let isSavingDate = false;
+        const finishEdit = async () => {
+            if (isSavingDate) return;
+            isSavingDate = true;
+            if (input.value) {
+                const nextItems = await this.getCurrentDeadlineItems();
+                const target = nextItems.find(d => d.id === id);
+                if (target) target.deadline = new Date(input.value).toISOString();
+                await this.saveCurrentDeadlineItems(nextItems);
+            }
+            await this.loadDeadlines();
+        };
+
+        input.onclick = (e) => e.stopPropagation();
+        input.onblur = finishEdit;
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') finishEdit();
+            if (e.key === 'Escape') {
+                isSavingDate = true;
+                this.loadDeadlines();
+            }
+        };
+        setTimeout(() => {
+            input.focus();
+            if (input.showPicker) input.showPicker();
+        }, 0);
+    },
+
+    async deleteDeadlineItem(id) {
+        const items = await this.getCurrentDeadlineItems();
+        await this.saveCurrentDeadlineItems(items.filter(item => item.id !== id));
+        await this.loadDeadlines();
+    },
+
+    startDeadlineTimer() {
+        this.stopDeadlineTimer();
+        this.deadlineTimer = setInterval(async () => {
+            const page = await this.getCurrentPage();
+            const activeElement = document.activeElement;
+            const isEditing = activeElement && activeElement.closest && activeElement.closest('.deadline-item');
+            if (page && page.type === 'deadline' && !isEditing) {
+                await this.loadDeadlines();
+            }
+        }, 60 * 60 * 1000);
+    },
+
+    stopDeadlineTimer() {
+        if (this.deadlineTimer) {
+            clearInterval(this.deadlineTimer);
+            this.deadlineTimer = null;
         }
     },
 
