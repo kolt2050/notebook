@@ -244,16 +244,36 @@ const API = {
   },
 
   // --- Shortcuts for Dashboard ---
+  async getShortcutPages() {
+    let pages = await _get('notebook_shortcut_pages');
+    if (!pages) {
+      // Migrate from old shortcuts
+      const oldShortcuts = await _get(STORAGE_KEYS.SHORTCUTS);
+      const defaultShortcuts = Array.isArray(oldShortcuts) ? oldShortcuts : [
+        { id: '1', title: 'Google', url: 'https://google.com', icon: '🔍' },
+        { id: '2', title: 'GitHub', url: 'https://github.com', icon: '💻' }
+      ];
+      pages = [
+        { id: 'page_1', title: 'Лист 1', shortcuts: defaultShortcuts }
+      ];
+      await _set({ 'notebook_shortcut_pages': pages });
+    }
+    return pages;
+  },
+
+  async saveShortcutPages(pages) {
+    await _set({ 'notebook_shortcut_pages': pages });
+  },
+
   async getShortcuts() {
-    const shortcuts = await _get(STORAGE_KEYS.SHORTCUTS);
-    return Array.isArray(shortcuts) ? shortcuts : [
-      { id: '1', title: 'Google', url: 'https://google.com', icon: '🔍' },
-      { id: '2', title: 'GitHub', url: 'https://github.com', icon: '💻' }
-    ];
+    const pages = await this.getShortcutPages();
+    return pages[0].shortcuts; // Fallback for old code if any
   },
 
   async saveShortcuts(shortcuts) {
-    await _set({ [STORAGE_KEYS.SHORTCUTS]: shortcuts });
+    const pages = await this.getShortcutPages();
+    pages[0].shortcuts = shortcuts;
+    await this.saveShortcutPages(pages);
   },
 
   // --- Export all documents as Markdown ---
@@ -286,11 +306,11 @@ const API = {
   },
 
   async backupShortcuts() {
-    const shortcuts = await _get(STORAGE_KEYS.SHORTCUTS);
+    const pages = await this.getShortcutPages();
     return {
-      shortcuts: Array.isArray(shortcuts) ? shortcuts : [],
+      pages: pages,
       exported_at: new Date().toISOString(),
-      version: 1,
+      version: 2,
       type: 'shortcuts'
     };
   },
@@ -312,13 +332,19 @@ const API = {
   },
 
   async importShortcuts(data) {
-    if (!data || !Array.isArray(data.shortcuts)) {
-      throw new Error('Invalid import data: missing shortcuts array');
+    if (!data) throw new Error('Invalid import data');
+    
+    if (data.version === 2 && Array.isArray(data.pages)) {
+      await this.saveShortcutPages(data.pages);
+    } else if (Array.isArray(data.shortcuts)) {
+      // Legacy import
+      const pages = [
+        { id: 'page_1', title: 'Лист 1', shortcuts: data.shortcuts }
+      ];
+      await this.saveShortcutPages(pages);
+    } else {
+      throw new Error('Invalid import data: missing shortcuts array or pages array');
     }
-
-    await _set({
-      [STORAGE_KEYS.SHORTCUTS]: data.shortcuts
-    });
 
     return { status: 'success', message: 'Shortcuts imported successfully' };
   }

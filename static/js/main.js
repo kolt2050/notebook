@@ -1,4 +1,5 @@
 const Main = {
+    currentTabIndex: 0,
     async init() {
         try {
             if (typeof TurndownService !== 'undefined') {
@@ -87,8 +88,122 @@ const Main = {
             Editor.save();
         }, 5 * 60 * 1000);
 
+        await this.loadShortcutTabs();
         await this.loadShortcuts();
         this.showDashboard();
+    },
+
+    async getCurrentShortcuts() {
+        const pages = await API.getShortcutPages();
+        if (this.currentTabIndex >= pages.length) this.currentTabIndex = Math.max(0, pages.length - 1);
+        if (!pages[this.currentTabIndex].shortcuts) pages[this.currentTabIndex].shortcuts = [];
+        return pages[this.currentTabIndex].shortcuts;
+    },
+
+    async saveCurrentShortcuts(shortcuts) {
+        const pages = await API.getShortcutPages();
+        if (this.currentTabIndex >= pages.length) this.currentTabIndex = Math.max(0, pages.length - 1);
+        pages[this.currentTabIndex].shortcuts = shortcuts;
+        await API.saveShortcutPages(pages);
+    },
+
+    async loadShortcutTabs() {
+        const pages = await API.getShortcutPages();
+        const tabsContainer = document.getElementById('shortcut-tabs');
+        if (!tabsContainer) return;
+        
+        tabsContainer.innerHTML = '';
+        pages.forEach((page, index) => {
+            const tab = document.createElement('div');
+            tab.className = `shortcut-tab ${index === this.currentTabIndex ? 'active' : ''}`;
+            
+            tab.ondblclick = (e) => {
+                e.stopPropagation();
+                this.renameShortcutTab(index);
+            };
+            
+            tab.onclick = (e) => {
+                if (e.target.closest('.tab-close') || e.target.tagName === 'INPUT') return;
+                if (this.currentTabIndex === index) return; // Allow double-click by not re-rendering
+                this.currentTabIndex = index;
+                this.loadShortcutTabs();
+                this.loadShortcuts();
+            };
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = page.title || `Лист ${index + 1}`;
+            tab.appendChild(titleSpan);
+            
+            if (pages.length > 1) {
+                const closeBtn = document.createElement('span');
+                closeBtn.className = 'tab-close';
+                closeBtn.textContent = '×';
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteShortcutTab(index);
+                };
+                tab.appendChild(closeBtn);
+            }
+            
+            tabsContainer.appendChild(tab);
+        });
+    },
+
+    async addShortcutTab() {
+        const pages = await API.getShortcutPages();
+        const newId = 'page_' + Date.now();
+        pages.push({ id: newId, title: `Лист ${pages.length + 1}`, shortcuts: [] });
+        await API.saveShortcutPages(pages);
+        this.currentTabIndex = pages.length - 1;
+        await this.loadShortcutTabs();
+        await this.loadShortcuts();
+    },
+
+    async deleteShortcutTab(index) {
+        Modals.showConfirm('Delete Tab', 'Are you sure you want to delete this tab and all its shortcuts?', async () => {
+            const pages = await API.getShortcutPages();
+            if (pages.length <= 1) return;
+            pages.splice(index, 1);
+            await API.saveShortcutPages(pages);
+            if (this.currentTabIndex >= pages.length) {
+                this.currentTabIndex = Math.max(0, pages.length - 1);
+            }
+            await this.loadShortcutTabs();
+            await this.loadShortcuts();
+        }, 'danger');
+    },
+
+    async renameShortcutTab(index) {
+        const tabsContainer = document.getElementById('shortcut-tabs');
+        const tabEl = tabsContainer.children[index];
+        const titleSpan = tabEl.querySelector('span:not(.tab-close)');
+        const currentTitle = titleSpan.textContent;
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'shortcut-tab-rename';
+        input.value = currentTitle;
+        
+        titleSpan.style.display = 'none';
+        tabEl.insertBefore(input, titleSpan);
+        input.focus();
+        input.select();
+        
+        const finishRename = async () => {
+            const newTitle = input.value.trim();
+            if (newTitle && newTitle !== currentTitle) {
+                const pages = await API.getShortcutPages();
+                pages[index].title = newTitle;
+                await API.saveShortcutPages(pages);
+            }
+            await this.loadShortcutTabs();
+        };
+        
+        input.onblur = finishRename;
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') finishRename();
+            if (e.key === 'Escape') this.loadShortcutTabs();
+        };
     },
 
     findEmptySlot(shortcuts) {
@@ -113,7 +228,7 @@ const Main = {
     },
 
     async loadShortcuts() {
-        const shortcuts = await API.getShortcuts();
+        const shortcuts = await this.getCurrentShortcuts();
         const container = document.getElementById('shortcuts-container');
         if (!container) return;
 
@@ -242,7 +357,7 @@ const Main = {
             newX = Math.max(0, newX);
             newY = Math.max(0, newY);
 
-            const currentShortcuts = await API.getShortcuts();
+            const currentShortcuts = await this.getCurrentShortcuts();
             
             const targetIndex = currentShortcuts.findIndex(s => s.x === newX && s.y === newY);
             if (targetIndex !== -1 && targetIndex !== this.draggedShortcutIndex) {
@@ -259,12 +374,12 @@ const Main = {
 
             this.draggedShortcutIndex = -1;
 
-            await API.saveShortcuts(currentShortcuts);
+            await this.saveCurrentShortcuts(currentShortcuts);
             await this.loadShortcuts();
         };
 
         if (needsSave) {
-            await API.saveShortcuts(shortcuts);
+            await this.saveCurrentShortcuts(shortcuts);
         }
     },
 
@@ -381,9 +496,9 @@ const Main = {
                 } catch (e) { }
             }
 
-            const shortcuts = await API.getShortcuts();
+            const shortcuts = await this.getCurrentShortcuts();
             shortcuts.push({ id: Date.now().toString(), title, url, icon, bgColor });
-            await API.saveShortcuts(shortcuts);
+            await this.saveCurrentShortcuts(shortcuts);
             await this.loadShortcuts();
         });
         this.setupIconSelection();
@@ -438,7 +553,7 @@ const Main = {
     },
 
     async editShortcut(id) {
-        const shortcuts = await API.getShortcuts();
+        const shortcuts = await this.getCurrentShortcuts();
         const shortcut = shortcuts.find(s => s.id === id);
         if (!shortcut) return;
 
@@ -472,7 +587,7 @@ const Main = {
             }
 
             if (!shortcut.title || !shortcut.url) return;
-            await API.saveShortcuts(shortcuts);
+            await this.saveCurrentShortcuts(shortcuts);
             await this.loadShortcuts();
         });
         this.setupIconSelection();
@@ -480,9 +595,9 @@ const Main = {
 
     async deleteShortcut(id) {
         Modals.showConfirm('Delete Shortcut', 'Are you sure you want to delete this shortcut?', async () => {
-            let shortcuts = await API.getShortcuts();
+            let shortcuts = await this.getCurrentShortcuts();
             shortcuts = shortcuts.filter(s => s.id !== id);
-            await API.saveShortcuts(shortcuts);
+            await this.saveCurrentShortcuts(shortcuts);
             await this.loadShortcuts();
         }, 'danger');
     },
@@ -542,6 +657,9 @@ const Main = {
     addEventListeners() {
         const homeBtn = document.getElementById('home-btn');
         if (homeBtn) homeBtn.onclick = () => this.showDashboard();
+
+        const addTabBtn = document.getElementById('add-shortcut-tab-btn');
+        if (addTabBtn) addTabBtn.onclick = () => this.addShortcutTab();
 
         const welcomeAddBtn = document.getElementById('welcome-add-btn');
         if (welcomeAddBtn) welcomeAddBtn.onclick = () => this.addNew();
@@ -923,6 +1041,7 @@ const Main = {
             }
 
             await API.importShortcuts(data);
+            await this.loadShortcutTabs();
             await this.loadShortcuts();
             Modals.showInfo(I18n.get('notice_title') || 'Notice', 'Shortcuts imported successfully');
         } catch (err) {
