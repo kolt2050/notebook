@@ -1167,18 +1167,10 @@ const Main = {
         }
     },
 
-    async exportCurrent() {
-        if (!Editor.currentDoc) {
-            Modals.showInfo(I18n.get('notice_title'), I18n.get('select_first'));
-            return;
-        }
-        if (!this.turndown) {
-            Modals.showInfo(I18n.get('error_title'), I18n.get('converter_error'));
-            return;
-        }
+    convertHtmlToMarkdown(html) {
         // Pre-process HTML: normalize div structure for proper line breaks
         // Editor wraps each line in <div>, TurndownService treats <div> as paragraph (double newline)
-        let html = Editor.contentArea.innerHTML;
+        html = html || '';
         // Replace empty divs (blank line indicators in editor) with <br><br> (paragraph break)
         html = html.replace(/<div>\s*(?:<br\s*\/?>)?\s*<\/div>/gi, '<br><br>');
         // Replace </div><div> boundaries between content divs with <br> (line break)
@@ -1205,13 +1197,40 @@ const Main = {
         // Trim leading/trailing whitespace
         md = md.trim();
 
+        return md;
+    },
+
+    async exportCurrent() {
+        if (!Editor.currentDoc) {
+            Modals.showInfo(I18n.get('notice_title'), I18n.get('select_first'));
+            return;
+        }
+        if (!this.turndown) {
+            Modals.showInfo(I18n.get('error_title'), I18n.get('converter_error'));
+            return;
+        }
+
+        const md = this.convertHtmlToMarkdown(Editor.contentArea.innerHTML);
         const fileName = `${Editor.currentDoc.title}.md`;
         this.downloadFile(fileName, md);
     },
 
     async exportAll() {
         try {
-            const md = await API.exportAllMarkdown();
+            if (!this.turndown) {
+                Modals.showInfo(I18n.get('error_title'), I18n.get('converter_error'));
+                return;
+            }
+
+            await Editor.save();
+
+            const docs = await API.getMarkdownExportDocuments();
+            const md = docs.map(doc => {
+                const level = Math.min((doc.depth || 0) + 1, 6);
+                const title = (doc.title || 'Untitled').trim() || 'Untitled';
+                const body = this.convertHtmlToMarkdown(doc.content || '');
+                return `${'#'.repeat(level)} ${title}${body ? `\n\n${body}` : ''}`;
+            }).join('\n\n---\n\n').trim();
             this.downloadFile('notebook_export.md', md);
         } catch (err) {
             console.error('Export All failed:', err);

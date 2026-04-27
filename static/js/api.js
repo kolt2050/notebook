@@ -424,18 +424,52 @@ const API = {
   },
 
   // --- Export all documents as Markdown ---
-  async exportAllMarkdown() {
+  async getMarkdownExportDocuments() {
     const docs = await _getAllDocs();
-    // Sort by position
-    docs.sort((a, b) => (a.position - b.position) || (a.id - b.id));
+    const docMap = {};
 
-    let md = '';
     docs.forEach(doc => {
-      const plainContent = _getPlainText(doc.content);
-      md += `# ${doc.title}\n\n${plainContent}\n\n---\n\n`;
+      docMap[doc.id] = {
+        id: doc.id,
+        title: doc.title,
+        content: doc.content || '',
+        parent_id: doc.parent_id,
+        children: []
+      };
     });
 
-    return md.trim();
+    const roots = [];
+    docs.forEach(doc => {
+      const item = docMap[doc.id];
+      const parent = doc.parent_id !== null && doc.parent_id !== undefined ? docMap[doc.parent_id] : null;
+      if (parent) {
+        parent.children.push(item);
+      } else {
+        roots.push(item);
+      }
+    });
+
+    const sortByVisibleTitle = (items) => {
+      items.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { numeric: true, sensitivity: 'base' }));
+      items.forEach(item => sortByVisibleTitle(item.children));
+      return items;
+    };
+
+    const result = [];
+    const flatten = (items, depth = 0) => {
+      items.forEach(item => {
+        result.push({
+          id: item.id,
+          title: item.title || 'Untitled',
+          depth,
+          content: item.content || ''
+        });
+        flatten(item.children, depth + 1);
+      });
+    };
+
+    flatten(sortByVisibleTitle(roots));
+    return result;
   },
 
   async getPdfExportDocuments() {
