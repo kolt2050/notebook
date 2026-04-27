@@ -1126,6 +1126,7 @@ const Main = {
 
         // Export/Import stubs for now
         document.getElementById('export-doc-btn').onclick = () => this.exportCurrent();
+        document.getElementById('export-doc-pdf-btn').onclick = () => this.exportCurrentPdf();
         document.getElementById('export-all-btn').onclick = () => this.exportAll();
         document.getElementById('export-pdf-btn').onclick = () => this.exportAllPdf();
         document.getElementById('backup-db-btn').onclick = () => this.backupDb();
@@ -1210,9 +1211,42 @@ const Main = {
             return;
         }
 
-        const md = this.convertHtmlToMarkdown(Editor.contentArea.innerHTML);
-        const fileName = `${Editor.currentDoc.title}.md`;
+        await Editor.save();
+
+        const title = (Editor.currentDoc.title || 'Untitled').trim() || 'Untitled';
+        const body = this.convertHtmlToMarkdown(Editor.currentDoc.content || Editor.contentArea.innerHTML);
+        const md = `# ${title}${body ? `\n\n${body}` : ''}`;
+        const fileName = `${title}.md`;
         this.downloadFile(fileName, md);
+    },
+
+    async exportCurrentPdf() {
+        try {
+            if (!Editor.currentDoc) {
+                Modals.showInfo(I18n.get('notice_title'), I18n.get('select_first'));
+                return;
+            }
+
+            await Editor.save();
+
+            if (!window.PDFLib || !window.fontkit) {
+                throw new Error('PDF libraries are not loaded');
+            }
+
+            const docs = await API.getPdfExportDocuments();
+            const doc = docs.find(item => item.id === Editor.currentDoc.id);
+            if (!doc) {
+                Modals.showInfo(I18n.get('notice_title'), I18n.get('select_first'));
+                return;
+            }
+
+            const blob = await this.buildTextPdf([doc]);
+            const title = (Editor.currentDoc.title || 'Untitled').trim() || 'Untitled';
+            this.downloadBlob(`${title}.pdf`, blob);
+        } catch (err) {
+            console.error('PDF export failed:', err);
+            Modals.showInfo(I18n.get('error_title'), I18n.get('export_pdf_error'));
+        }
     },
 
     async exportAll() {

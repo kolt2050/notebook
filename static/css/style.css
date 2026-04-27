@@ -392,9 +392,26 @@ a:hover {
     background: var(--border-color);
 }
 
+.toolbar-btn.secondary {
+    background: var(--border-color);
+    border-color: transparent;
+    color: var(--text-color);
+}
+
 .toolbar-btn.primary {
     background: var(--primary-color);
     border-color: var(--primary-hover);
+}
+
+.toolbar-btn.pdf-export {
+    background: rgba(187, 128, 9, 0.14);
+    border-color: rgba(240, 187, 64, 0.42);
+    color: #f0bb40;
+}
+
+.toolbar-btn.pdf-export:hover {
+    background: rgba(187, 128, 9, 0.24);
+    border-color: #f0bb40;
 }
 
 .toolbar-btn.danger {
