@@ -11,6 +11,8 @@
     <!-- Highlight.js -->
     <link rel="stylesheet" href="lib/github-dark.min.css">
     <script src="lib/highlight.min.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
+    <script src="lib/fontkit.umd.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600&display=swap"
         rel="stylesheet">
@@ -45,6 +47,8 @@
                 <div class="sidebar-footer-actions" style="margin-bottom: 15px;">
                     <button id="export-all-btn" class="btn secondary" data-i18n="export_all"
                         style="width: 100%; padding: 6px;">Export All</button>
+                    <button id="export-pdf-btn" class="btn pdf-export" data-i18n="export_pdf"
+                        style="width: 100%; padding: 6px; margin-top: 8px;">Export PDF</button>
                     <button id="backup-db-btn" class="btn backup" data-i18n="backup_db"
                         style="width: 100%; padding: 6px; margin-top: 8px;">Export JSON</button>
                     <button id="import-db-btn" class="btn import" data-i18n="import_db"

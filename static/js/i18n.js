@@ -7,6 +7,7 @@ const I18n = {
           app_title: "Notebook",
           add_doc: "Add Document",
           backup_db: "Export JSON",
+          export_pdf: "Export PDF",
           import_db: "Import JSON",
           confirm_import_title: "Import Data?",
           confirm_import_text: "This will overwrite all current documents. Are you sure?",
@@ -30,6 +31,9 @@ const I18n = {
             select_first: "Please select a document first.",
             converter_error: "Markdown converter not loaded. Please check your connection.",
             export_all_error: "Failed to export all documents",
+            export_pdf_error: "Failed to export PDF",
+            export_pdf_empty: "There are no documents to export.",
+            export_pdf_empty_doc: "Empty document",
             move_error_title: "Error",
             move_circular_error: "Cannot move a document into its own sub-document.",
             move_failed: "Failed to move document",
@@ -39,6 +43,10 @@ const I18n = {
             ctrl_click_hint: "Ctrl + Click to follow link"
         },
         RU: {
+          export_pdf: "Экспорт PDF",
+          export_pdf_error: "Не удалось экспортировать PDF",
+          export_pdf_empty: "Нет документов для экспорта.",
+          export_pdf_empty_doc: "Пустой документ",
           welcome_title: "Блокнот",
           shortcuts_title: "Мои ссылки",
           app_title: "Блокнот",

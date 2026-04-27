@@ -1127,6 +1127,7 @@ const Main = {
         // Export/Import stubs for now
         document.getElementById('export-doc-btn').onclick = () => this.exportCurrent();
         document.getElementById('export-all-btn').onclick = () => this.exportAll();
+        document.getElementById('export-pdf-btn').onclick = () => this.exportAllPdf();
         document.getElementById('backup-db-btn').onclick = () => this.backupDb();
         document.getElementById('import-db-btn').onclick = () => this.importDb();
 
@@ -1218,6 +1219,322 @@ const Main = {
         }
     },
 
+    async exportAllPdf() {
+        try {
+            await Editor.save();
+
+            if (!window.PDFLib || !window.fontkit) {
+                throw new Error('PDF libraries are not loaded');
+            }
+
+            const docs = await API.getPdfExportDocuments();
+            if (!docs.length) {
+                Modals.showInfo(I18n.get('notice_title'), I18n.get('export_pdf_empty'));
+                return;
+            }
+
+            const blob = await this.buildTextPdf(docs);
+            this.downloadBlob('notebook_export.pdf', blob);
+        } catch (err) {
+            console.error('PDF export failed:', err);
+            Modals.showInfo(I18n.get('error_title'), I18n.get('export_pdf_error'));
+        }
+    },
+
+    async buildTextPdf(docs) {
+        const { PDFDocument, rgb } = window.PDFLib;
+        const pdfDoc = await PDFDocument.create();
+        pdfDoc.registerFontkit(window.fontkit);
+
+        const fontUrl = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL)
+            ? chrome.runtime.getURL('static/fonts/NotoSans-Regular.ttf')
+            : 'fonts/NotoSans-Regular.ttf';
+        const fontBytes = await fetch(fontUrl).then(response => {
+            if (!response.ok) throw new Error('Failed to load PDF font');
+            return response.arrayBuffer();
+        });
+        const font = await pdfDoc.embedFont(fontBytes, { subset: true });
+
+        const layout = {
+            width: 595.28,
+            height: 841.89,
+            marginX: 54,
+            top: 64,
+            bottom: 54,
+            titleSize: 18,
+            pathSize: 9,
+            bodySize: 11,
+            footerSize: 8,
+            titleLineHeight: 24,
+            pathLineHeight: 13,
+            bodyLineHeight: 16
+        };
+
+        const colors = {
+            text: rgb(0.07, 0.09, 0.15),
+            muted: rgb(0.36, 0.39, 0.45),
+            rule: rgb(0.82, 0.84, 0.87)
+        };
+
+        const drawHeader = (page, doc, pageNumber) => {
+            let y = layout.height - layout.top;
+            const maxWidth = layout.width - (layout.marginX * 2);
+            const titleLines = this.wrapPdfText(font, doc.title, layout.titleSize, maxWidth, 2);
+            titleLines.forEach(line => {
+                page.drawText(line, {
+                    x: layout.marginX,
+                    y,
+                    size: layout.titleSize,
+                    font,
+                    color: colors.text
+                });
+                y -= layout.titleLineHeight;
+            });
+
+            y -= 2;
+            const pathLines = this.wrapPdfText(font, doc.path, layout.pathSize, maxWidth, 2);
+            pathLines.forEach(line => {
+                page.drawText(line, {
+                    x: layout.marginX,
+                    y,
+                    size: layout.pathSize,
+                    font,
+                    color: colors.muted
+                });
+                y -= layout.pathLineHeight;
+            });
+
+            y -= 10;
+            page.drawLine({
+                start: { x: layout.marginX, y },
+                end: { x: layout.width - layout.marginX, y },
+                thickness: 0.8,
+                color: colors.rule
+            });
+
+            page.drawText(`Document page ${pageNumber}`, {
+                x: layout.marginX,
+                y: 28,
+                size: layout.footerSize,
+                font,
+                color: colors.muted
+            });
+
+            return y - 24;
+        };
+
+        const newPage = (doc, pageNumber) => {
+            const page = pdfDoc.addPage([layout.width, layout.height]);
+            const y = drawHeader(page, doc, pageNumber);
+            return { page, y };
+        };
+
+        for (const doc of docs) {
+            let docPageNumber = 1;
+            let current = newPage(doc, docPageNumber);
+            const blocks = Array.isArray(doc.blocks) && doc.blocks.length
+                ? doc.blocks
+                : [{ type: 'text', text: doc.content || I18n.get('export_pdf_empty_doc') }];
+
+            for (const block of blocks) {
+                if (block.type === 'image') {
+                    current = await this.drawPdfImageBlock({
+                        pdfDoc,
+                        block,
+                        current,
+                        doc,
+                        font,
+                        layout,
+                        colors,
+                        newPage: () => {
+                            docPageNumber += 1;
+                            return newPage(doc, docPageNumber);
+                        }
+                    });
+                } else {
+                    current = this.drawPdfTextBlock({
+                        block,
+                        current,
+                        doc,
+                        font,
+                        layout,
+                        colors,
+                        newPage: () => {
+                            docPageNumber += 1;
+                            return newPage(doc, docPageNumber);
+                        }
+                    });
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        const pdfBytes = await pdfDoc.save();
+        return new Blob([pdfBytes], { type: 'application/pdf' });
+    },
+
+    drawPdfTextBlock({ block, current, font, layout, colors, newPage }) {
+        const text = block.text || '';
+        const paragraphs = text.replace(/\r/g, '').split(/\n{2,}/);
+
+        for (const paragraph of paragraphs) {
+            const sourceLines = paragraph.split('\n');
+            const wrappedLines = sourceLines.flatMap(line => {
+                const isList = /^\s*([-*+]|\d+[.)])\s+/.test(line);
+                const indent = isList ? 14 : 0;
+                const availableWidth = layout.width - (layout.marginX * 2) - indent;
+                const lines = this.wrapPdfText(font, line, layout.bodySize, availableWidth);
+                return lines.map((content, index) => ({
+                    content,
+                    indent: index === 0 ? indent : indent + 10
+                }));
+            });
+
+            for (const line of wrappedLines) {
+                if (current.y < layout.bottom + layout.bodyLineHeight) {
+                    current = newPage();
+                }
+
+                current.page.drawText(line.content || ' ', {
+                    x: layout.marginX + line.indent,
+                    y: current.y,
+                    size: layout.bodySize,
+                    font,
+                    color: colors.text
+                });
+                current.y -= layout.bodyLineHeight;
+            }
+
+            current.y -= 8;
+        }
+
+        return current;
+    },
+
+    async drawPdfImageBlock({ pdfDoc, block, current, font, layout, colors, newPage }) {
+        try {
+            const imageData = this.getPdfImageData(block.src);
+            if (!imageData) {
+                return this.drawPdfTextBlock({
+                    block: { type: 'text', text: `[${block.alt || 'Image'}]` },
+                    current,
+                    font,
+                    layout,
+                    colors,
+                    newPage
+                });
+            }
+
+            const image = imageData.mimeType === 'image/png'
+                ? await pdfDoc.embedPng(imageData.bytes)
+                : await pdfDoc.embedJpg(imageData.bytes);
+            const maxWidth = layout.width - (layout.marginX * 2);
+            const maxHeight = layout.height - layout.top - layout.bottom - 80;
+            const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+            const width = image.width * scale;
+            const height = image.height * scale;
+
+            if (current.y - height < layout.bottom) {
+                current = newPage();
+            }
+
+            current.page.drawImage(image, {
+                x: layout.marginX,
+                y: current.y - height,
+                width,
+                height
+            });
+            current.y -= height + 14;
+        } catch (err) {
+            console.warn('Failed to embed PDF image:', err);
+            current = this.drawPdfTextBlock({
+                block: { type: 'text', text: `[${block.alt || 'Image'}]` },
+                current,
+                font,
+                layout,
+                colors,
+                newPage
+            });
+        }
+
+        return current;
+    },
+
+    getPdfImageData(src) {
+        if (!src || !src.startsWith('data:image/')) return null;
+
+        const match = src.match(/^data:(image\/(?:png|jpeg|jpg));base64,(.+)$/i);
+        if (!match) return null;
+
+        const mimeType = match[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : match[1].toLowerCase();
+        const binary = atob(match[2]);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+
+        return { mimeType, bytes };
+    },
+
+    wrapPdfText(font, text, fontSize, maxWidth, maxLines = Infinity) {
+        const normalized = String(text || '').replace(/\t/g, '    ').trim();
+        if (!normalized) return [''];
+
+        const words = normalized.split(/\s+/);
+        const lines = [];
+        let line = '';
+
+        const splitLongWord = (word) => {
+            const parts = [];
+            let part = '';
+            for (const char of word) {
+                if (font.widthOfTextAtSize(part + char, fontSize) > maxWidth && part) {
+                    parts.push(part);
+                    part = char;
+                } else {
+                    part += char;
+                }
+            }
+            if (part) parts.push(part);
+            return parts;
+        };
+
+        for (const word of words) {
+            const segments = font.widthOfTextAtSize(word, fontSize) > maxWidth ? splitLongWord(word) : [word];
+            for (const segment of segments) {
+                const nextLine = line ? `${line} ${segment}` : segment;
+                if (font.widthOfTextAtSize(nextLine, fontSize) <= maxWidth) {
+                    line = nextLine;
+                    continue;
+                }
+
+                if (line) lines.push(line);
+                line = segment;
+
+                if (lines.length >= maxLines) {
+                    return this.truncatePdfLines(font, lines, fontSize, maxWidth);
+                }
+            }
+        }
+
+        if (line) lines.push(line);
+        if (lines.length > maxLines) {
+            return this.truncatePdfLines(font, lines.slice(0, maxLines), fontSize, maxWidth);
+        }
+        return lines.length ? lines : [''];
+    },
+
+    truncatePdfLines(font, lines, fontSize, maxWidth) {
+        const result = [...lines];
+        let last = result[result.length - 1] || '';
+        while (last.length && font.widthOfTextAtSize(`${last}...`, fontSize) > maxWidth) {
+            last = last.slice(0, -1);
+        }
+        result[result.length - 1] = `${last}...`;
+        return result;
+    },
+
     async refreshStats() {
 
         const count = await API.getDocCount();
@@ -1290,6 +1607,10 @@ const Main = {
     downloadFile(filename, text) {
         const mimeType = filename.endsWith('.md') ? 'text/markdown' : 'text/html';
         const blob = new Blob([text], { type: mimeType });
+        this.downloadBlob(filename, blob);
+    },
+
+    downloadBlob(filename, blob) {
         const url = URL.createObjectURL(blob);
         const element = document.createElement('a');
         element.href = url;

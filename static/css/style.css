@@ -595,6 +595,18 @@ a:hover {
     border-color: #58a6ff;
 }
 
+.btn.pdf-export {
+    background: rgba(187, 128, 9, 0.14);
+    border: 1px solid rgba(240, 187, 64, 0.42);
+    color: #f0bb40;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+
+.btn.pdf-export:hover {
+    background: rgba(187, 128, 9, 0.24);
+    border-color: #f0bb40;
+}
+
 .btn.import {
     background: rgba(35, 134, 54, 0.1);
     border: 1px solid rgba(35, 134, 54, 0.3);

@@ -70,6 +70,104 @@ function _getPlainText(html) {
   return div.textContent || div.innerText || '';
 }
 
+function _getExportText(html) {
+  if (!html) return '';
+
+  const div = document.createElement('div');
+  div.innerHTML = html;
+
+  div.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+
+  const blockTags = new Set(['DIV', 'P', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'BLOCKQUOTE']);
+  const parts = [];
+
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      parts.push(node.nodeValue);
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const isBlock = blockTags.has(node.tagName);
+    if (node.tagName === 'LI') parts.push('- ');
+    if (node.tagName === 'IMG') {
+      const alt = node.getAttribute('alt') || node.getAttribute('title') || 'Image';
+      parts.push(`[${alt}]`);
+    }
+
+    node.childNodes.forEach(walk);
+
+    if (isBlock) parts.push('\n');
+  };
+
+  div.childNodes.forEach(walk);
+
+  return parts
+    .join('')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function _normalizeExportText(text) {
+  return text
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function _getPdfExportBlocks(html) {
+  if (!html) return [];
+
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  div.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode('\n')));
+
+  const blockTags = new Set(['DIV', 'P', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'BLOCKQUOTE']);
+  const blocks = [];
+  let textParts = [];
+
+  const flushText = () => {
+    const text = _normalizeExportText(textParts.join(''));
+    if (text) blocks.push({ type: 'text', text });
+    textParts = [];
+  };
+
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      textParts.push(node.nodeValue);
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    if (node.tagName === 'IMG') {
+      flushText();
+      blocks.push({
+        type: 'image',
+        src: node.getAttribute('src') || '',
+        alt: node.getAttribute('alt') || node.getAttribute('title') || 'Image'
+      });
+      return;
+    }
+
+    const isBlock = blockTags.has(node.tagName);
+    if (node.tagName === 'LI') textParts.push('- ');
+
+    node.childNodes.forEach(walk);
+
+    if (isBlock) textParts.push('\n\n');
+  };
+
+  div.childNodes.forEach(walk);
+  flushText();
+
+  return blocks;
+}
+
 const API = {
   normalizeShortcutPages(pages) {
     let changed = false;
@@ -338,6 +436,55 @@ const API = {
     });
 
     return md.trim();
+  },
+
+  async getPdfExportDocuments() {
+    const docs = await _getAllDocs();
+    const docMap = {};
+
+    docs.forEach(doc => {
+      docMap[doc.id] = {
+        ...doc,
+        children: []
+      };
+    });
+
+    const roots = [];
+    docs.forEach(doc => {
+      const item = docMap[doc.id];
+      const parent = doc.parent_id !== null && doc.parent_id !== undefined ? docMap[doc.parent_id] : null;
+      if (parent) {
+        parent.children.push(item);
+      } else {
+        roots.push(item);
+      }
+    });
+
+    const sortByVisibleTitle = (items) => {
+      items.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { numeric: true, sensitivity: 'base' }));
+      items.forEach(item => sortByVisibleTitle(item.children));
+      return items;
+    };
+
+    const result = [];
+    const flatten = (items, ancestors = []) => {
+      items.forEach(item => {
+        const title = item.title || 'Untitled';
+        const pathParts = ancestors.concat(title);
+        result.push({
+          id: item.id,
+          title,
+          path: pathParts.join(' / '),
+          depth: ancestors.length,
+          content: _getExportText(item.content),
+          blocks: _getPdfExportBlocks(item.content)
+        });
+        flatten(item.children, pathParts);
+      });
+    };
+
+    flatten(sortByVisibleTitle(roots));
+    return result;
   },
 
   // --- Backup: export all data as JSON ---
